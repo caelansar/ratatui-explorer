@@ -14,7 +14,8 @@ use ratatui::{prelude::*, widgets::*};
 
 use ratatui_explorer::{File, FileExplorer, Theme};
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
 
@@ -23,7 +24,7 @@ fn main() -> io::Result<()> {
 
     // Create a new file explorer with the default theme and title.
     let theme = get_theme();
-    let mut file_explorer = FileExplorer::with_theme(theme)?;
+    let mut file_explorer = FileExplorer::with_theme(theme).await?;
 
     loop {
         // Get the content of the current selected file (if it's indeed a file).
@@ -58,7 +59,7 @@ fn main() -> io::Result<()> {
             }
         }
         // Handle the event in the file explorer.
-        file_explorer.handle(&event)?;
+        file_explorer.handle(&event).await?;
     }
 
     disable_raw_mode()?;

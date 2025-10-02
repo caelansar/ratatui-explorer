@@ -1,16 +1,17 @@
 use std::io::{self, stdout};
 
-use ratatui::crossterm;
 use crossterm::{
     event::{read, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use ratatui::crossterm;
 use ratatui::prelude::*;
 
 use ratatui_explorer::{FileExplorer, Theme};
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
 
@@ -18,7 +19,7 @@ fn main() -> io::Result<()> {
 
     // Create a new file explorer with the default theme and title.
     let theme = Theme::default().add_default_title();
-    let mut file_explorer = FileExplorer::with_theme(theme)?;
+    let mut file_explorer = FileExplorer::with_theme(theme).await?;
 
     loop {
         // Render the file explorer widget.
@@ -34,7 +35,7 @@ fn main() -> io::Result<()> {
             }
         }
         // Handle the event in the file explorer.
-        file_explorer.handle(&event)?;
+        file_explorer.handle(&event).await?;
     }
 
     disable_raw_mode()?;

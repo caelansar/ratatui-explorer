@@ -80,10 +80,10 @@ impl FileExplorer {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     /// assert_eq!(file_explorer.cwd().display().to_string(), "/Documents");
     /// ```
-    pub fn new() -> Result<FileExplorer> {
+    pub async fn new() -> Result<FileExplorer> {
         let cwd = std::env::current_dir()?;
 
         let mut file_explorer = Self {
@@ -94,7 +94,7 @@ impl FileExplorer {
             theme: Theme::default(),
         };
 
-        file_explorer.get_and_set_files()?;
+        file_explorer.get_and_set_files().await?;
 
         Ok(file_explorer)
     }
@@ -112,11 +112,11 @@ impl FileExplorer {
     /// ```no_run
     /// use ratatui_explorer::{FileExplorer, Theme};
     ///
-    /// let file_explorer = FileExplorer::with_theme(Theme::default().add_default_title()).unwrap();
+    /// let file_explorer = FileExplorer::with_theme(Theme::default().add_default_title()).await.unwrap();
     /// ```
     #[inline]
-    pub fn with_theme(theme: Theme) -> Result<FileExplorer> {
-        let mut file_explorer = Self::new()?;
+    pub async fn with_theme(theme: Theme) -> Result<FileExplorer> {
+        let mut file_explorer = Self::new().await?;
 
         file_explorer.theme = theme;
 
@@ -187,24 +187,24 @@ impl FileExplorer {
     /// ```no_run
     /// use ratatui_explorer::{FileExplorer, Input};
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
-    /// file_explorer.handle(Input::Down).unwrap();
+    /// file_explorer.handle(Input::Down).await.unwrap();
     /// assert_eq!(file_explorer.current().name(), "resume.pdf");
     ///
-    /// file_explorer.handle(Input::Up).unwrap();
-    /// file_explorer.handle(Input::Up).unwrap();
+    /// file_explorer.handle(Input::Up).await.unwrap();
+    /// file_explorer.handle(Input::Up).await.unwrap();
     /// assert_eq!(file_explorer.current().name(), "Documents");
     ///
-    /// file_explorer.handle(Input::Left).unwrap();
+    /// file_explorer.handle(Input::Left).await.unwrap();
     /// assert_eq!(file_explorer.cwd().display().to_string(), "/");
     ///
-    /// file_explorer.handle(Input::Right).unwrap();
+    /// file_explorer.handle(Input::Right).await.unwrap();
     /// assert_eq!(file_explorer.cwd().display().to_string(), "/Documents");
     /// ```
-    pub fn handle<I: Into<Input>>(&mut self, input: I) -> Result<()> {
+    pub async fn handle<I: Into<Input>>(&mut self, input: I) -> Result<()> {
         const SCROLL_COUNT: usize = 12;
 
         let input = input.into();
@@ -233,18 +233,18 @@ impl FileExplorer {
 
                 if let Some(parent) = parent {
                     self.cwd = parent.to_path_buf();
-                    self.get_and_set_files()?;
+                    self.get_and_set_files().await?;
                     self.selected = 0;
                 }
             }
             Input::Right => {
                 if self.files[self.selected].path.is_dir() {
                     self.cwd = self.files.swap_remove(self.selected).path;
-                    self.get_and_set_files()?;
+                    self.get_and_set_files().await?;
                     self.selected = 0;
                 }
             }
-            Input::ToggleShowHidden => self.set_show_hidden(!self.show_hidden)?,
+            Input::ToggleShowHidden => self.set_show_hidden(!self.show_hidden).await?,
             Input::None => (),
         }
 
@@ -262,15 +262,15 @@ impl FileExplorer {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
-    /// file_explorer.set_cwd("/Documents").unwrap();
+    /// file_explorer.set_cwd("/Documents").await.unwrap();
     /// assert_eq!(file_explorer.cwd().display().to_string(), "/Documents");
     /// ```
     #[inline]
-    pub fn set_cwd<P: Into<PathBuf>>(&mut self, cwd: P) -> Result<()> {
+    pub async fn set_cwd<P: Into<PathBuf>>(&mut self, cwd: P) -> Result<()> {
         self.cwd = cwd.into();
-        self.get_and_set_files()?;
+        self.get_and_set_files().await?;
         self.selected = 0;
 
         Ok(())
@@ -287,15 +287,15 @@ impl FileExplorer {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
-    /// file_explorer.set_show_hidden(true).unwrap();
+    /// file_explorer.set_show_hidden(true).await.unwrap();
     /// assert_eq!(file_explorer.show_hidden(), true);
     /// ```
     #[inline]
-    pub fn set_show_hidden(&mut self, show_hidden: bool) -> Result<()> {
+    pub async fn set_show_hidden(&mut self, show_hidden: bool) -> Result<()> {
         self.show_hidden = show_hidden;
-        self.get_and_set_files()?;
+        self.get_and_set_files().await?;
         self.selected = 0;
 
         Ok(())
@@ -530,46 +530,50 @@ impl FileExplorer {
 
     /// Get the files and directories in the current working directory and set them in the file explorer.
     /// It add the parent directory at the beginning of the [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files if it exist.
-    fn get_and_set_files(&mut self) -> Result<()> {
-        let (mut dirs, mut none_dirs): (Vec<_>, Vec<_>) = std::fs::read_dir(&self.cwd)?
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                let path = entry.path();
-                let metadata = path.metadata().ok();
-                let file_type = metadata.as_ref().map(|f| f.file_type());
-                let is_dir = file_type.is_some_and(|f| f.is_dir());
+    async fn get_and_set_files(&mut self) -> Result<()> {
+        let mut read_dir = tokio::fs::read_dir(&self.cwd).await?;
+        let mut entries = Vec::new();
 
-                let name = entry.file_name().to_string_lossy().into_owned();
-                let name = if is_dir { format!("{}/", name) } else { name };
+        while let Some(entry) = read_dir.next_entry().await? {
+            let path = entry.path();
+            let metadata = tokio::fs::metadata(&path).await.ok();
+            let file_type = metadata.as_ref().map(|f| f.file_type());
+            let is_dir = file_type.is_some_and(|f| f.is_dir());
 
-                let is_hidden = {
-                    #[cfg(unix)]
-                    {
-                        name.starts_with('.')
-                    }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let name = if is_dir { format!("{}/", name) } else { name };
 
-                    #[cfg(windows)]
-                    {
-                        use std::os::windows::fs::MetadataExt;
-                        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
-                        metadata.is_some_and(|f| f.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
-                    }
-                };
-
-                let file = File {
-                    name,
-                    path,
-                    is_dir,
-                    is_hidden,
-                    file_type,
-                };
-                if !self.show_hidden && file.is_hidden() {
-                    None
-                } else {
-                    Some(file)
+            let is_hidden = {
+                #[cfg(unix)]
+                {
+                    name.starts_with('.')
                 }
-            })
-            .partition(File::is_dir);
+
+                #[cfg(windows)]
+                {
+                    use std::os::windows::fs::MetadataExt;
+                    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+                    metadata.is_some_and(|f| f.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
+                }
+            };
+
+            let file = File {
+                name,
+                path,
+                is_dir,
+                is_hidden,
+                file_type,
+            };
+
+            if !self.show_hidden && file.is_hidden() {
+                // Skip hidden files if they shouldn't be shown
+            } else {
+                entries.push(file);
+            }
+        }
+
+        let (mut dirs, mut none_dirs): (Vec<_>, Vec<_>) =
+            entries.into_iter().partition(File::is_dir);
 
         dirs.sort_unstable_by(|f1, f2| f1.name.cmp(&f2.name));
         none_dirs.sort_unstable_by(|f1, f2| f1.name.cmp(&f2.name));
