@@ -380,6 +380,34 @@ impl<F: FileSystem> FileExplorer<F> {
         &self.files[self.selected]
     }
 
+    /// Select a file by name in the current directory.
+    ///
+    /// Returns true if the file was found and selected, false otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let mut file_explorer = FileExplorer::new().await?;
+    ///
+    /// // Select a specific file
+    /// if file_explorer.select_file("myfile.txt") {
+    ///     println!("Selected myfile.txt");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn select_file(&mut self, filename: &str) -> bool {
+        if let Some(index) = self.files.iter().position(|f| f.name == filename) {
+            self.selected = index;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Returns the current working directory of the file explorer.
     ///
     /// # Examples
