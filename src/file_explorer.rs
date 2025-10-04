@@ -1,8 +1,13 @@
-use std::{fs::FileType, io::Result, path::PathBuf};
+use std::{fs::FileType, io::Result, path::PathBuf, sync::Arc};
 
 use ratatui::widgets::WidgetRef;
 
-use crate::{input::Input, widget::Renderer, Theme};
+use crate::{
+    filesystem::{FileSystem, LocalFileSystem},
+    input::Input,
+    widget::Renderer,
+    Theme,
+};
 
 /// A file explorer that allows browsing and selecting files and directories.
 ///
@@ -48,45 +53,44 @@ use crate::{input::Input, widget::Renderer, Theme};
 /// println!("Current Directory: {}", current_working_directory.display());
 /// println!("Name: {}", current_file.name());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FileExplorer {
+#[derive(Debug, Clone)]
+pub struct FileExplorer<F: FileSystem = LocalFileSystem> {
+    filesystem: Arc<F>,
     cwd: PathBuf,
     files: Vec<File>,
     show_hidden: bool,
     selected: usize,
-    theme: Theme,
+    theme: Theme<F>,
 }
 
-impl FileExplorer {
-    /// Creates a new instance of `FileExplorer`.
+impl<F: FileSystem> FileExplorer<F> {
+    /// Creates a new instance of `FileExplorer` with a custom filesystem implementation.
     ///
-    /// This method initializes a `FileExplorer` with the current working directory.
-    /// By default, hidden files are not shown.
+    /// This method allows you to use the file explorer with different filesystem
+    /// backends (e.g., SFTP, S3, etc.) by providing an implementation of the
+    /// `FileSystem` trait.
     ///
     /// # Errors
     ///
-    /// Will return `Err` if the current working directory can not be listed. See [`current_dir`](https://doc.rust-lang.org/stable/std/env/fn.current_dir.html) for more information.
+    /// Will return `Err` if the initial directory cannot be read.
     ///
     /// # Examples
-    /// Suppose you have this tree file and your current working directory is `/Documents`:
-    /// ```plaintext
-    /// /
-    /// ├── .git
-    /// └── Documents  <- current working directory
-    ///     ├── passport.png
-    ///     └── resume.pdf
-    /// ```
-    /// You can create a new `FileExplorer` like this:
-    /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().await.unwrap();
-    /// assert_eq!(file_explorer.cwd().display().to_string(), "/Documents");
+    /// ```no_run
+    /// use std::sync::Arc;
+    /// use ratatui_explorer::{FileExplorer, LocalFileSystem};
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let fs = Arc::new(LocalFileSystem);
+    /// let file_explorer = FileExplorer::with_fs(fs, "/home/user".to_string()).await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub async fn new() -> Result<FileExplorer> {
-        let cwd = std::env::current_dir()?;
+    pub async fn with_fs(filesystem: Arc<F>, initial_path: String) -> Result<Self> {
+        let cwd = PathBuf::from(initial_path);
 
         let mut file_explorer = Self {
+            filesystem,
             cwd,
             files: vec![],
             show_hidden: false,
@@ -95,30 +99,6 @@ impl FileExplorer {
         };
 
         file_explorer.get_and_set_files().await?;
-
-        Ok(file_explorer)
-    }
-
-    /// Creates a new instance of `FileExplorer` with a specific theme.
-    ///
-    /// This method initializes a `FileExplorer` with the current working directory.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if the current working directory can not be listed.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ratatui_explorer::{FileExplorer, Theme};
-    ///
-    /// let file_explorer = FileExplorer::with_theme(Theme::default().add_default_title()).await.unwrap();
-    /// ```
-    #[inline]
-    pub async fn with_theme(theme: Theme) -> Result<FileExplorer> {
-        let mut file_explorer = Self::new().await?;
-
-        file_explorer.theme = theme;
 
         Ok(file_explorer)
     }
@@ -238,7 +218,10 @@ impl FileExplorer {
                 }
             }
             Input::Right => {
-                if self.files[self.selected].path.is_dir() {
+                // Use the is_dir field from File struct instead of PathBuf::is_dir()
+                // This is important for remote filesystems (SFTP) where PathBuf::is_dir()
+                // would check the local filesystem and always return false
+                if self.files[self.selected].is_dir {
                     self.cwd = self.files.swap_remove(self.selected).path;
                     self.get_and_set_files().await?;
                     self.selected = 0;
@@ -313,7 +296,7 @@ impl FileExplorer {
     /// file_explorer.set_theme(Theme::default().add_default_title());
     /// ```
     #[inline]
-    pub fn set_theme(&mut self, theme: Theme) {
+    pub fn set_theme(&mut self, theme: Theme<F>) {
         self.theme = theme;
     }
 
@@ -524,85 +507,100 @@ impl FileExplorer {
     /// ```
     #[inline]
     #[must_use]
-    pub const fn theme(&self) -> &Theme {
+    pub const fn theme(&self) -> &Theme<F> {
         &self.theme
     }
 
     /// Get the files and directories in the current working directory and set them in the file explorer.
     /// It add the parent directory at the beginning of the [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files if it exist.
     async fn get_and_set_files(&mut self) -> Result<()> {
-        let mut read_dir = tokio::fs::read_dir(&self.cwd).await?;
-        let mut entries = Vec::new();
+        // Use the FileSystem trait to read the directory
+        let entries = self
+            .filesystem
+            .read_dir(&self.cwd.to_string_lossy())
+            .await?;
 
-        while let Some(entry) = read_dir.next_entry().await? {
-            let path = entry.path();
-            let metadata = tokio::fs::metadata(&path).await.ok();
-            let file_type = metadata.as_ref().map(|f| f.file_type());
-            let is_dir = file_type.is_some_and(|f| f.is_dir());
+        // Convert FileEntry to File
+        let mut files: Vec<File> = entries
+            .into_iter()
+            .filter(|entry| self.show_hidden || !entry.is_hidden)
+            .map(|entry| File {
+                name: entry.name,
+                path: PathBuf::from(entry.path),
+                is_dir: entry.is_dir,
+                is_hidden: entry.is_hidden,
+                file_type: None, // FileEntry doesn't include FileType
+            })
+            .collect();
 
-            let name = entry.file_name().to_string_lossy().into_owned();
-            let name = if is_dir { format!("{}/", name) } else { name };
-
-            let is_hidden = {
-                #[cfg(unix)]
-                {
-                    name.starts_with('.')
-                }
-
-                #[cfg(windows)]
-                {
-                    use std::os::windows::fs::MetadataExt;
-                    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
-                    metadata.is_some_and(|f| f.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
-                }
-            };
-
-            let file = File {
-                name,
-                path,
-                is_dir,
-                is_hidden,
-                file_type,
-            };
-
-            if !self.show_hidden && file.is_hidden() {
-                // Skip hidden files if they shouldn't be shown
-            } else {
-                entries.push(file);
-            }
+        // Add parent directory if it exists
+        if let Some(parent) = self.cwd.parent() {
+            files.insert(
+                0,
+                File {
+                    name: "../".to_owned(),
+                    path: parent.to_path_buf(),
+                    is_dir: true,
+                    is_hidden: false,
+                    file_type: None,
+                },
+            );
         }
 
-        let (mut dirs, mut none_dirs): (Vec<_>, Vec<_>) =
-            entries.into_iter().partition(File::is_dir);
-
-        dirs.sort_unstable_by(|f1, f2| f1.name.cmp(&f2.name));
-        none_dirs.sort_unstable_by(|f1, f2| f1.name.cmp(&f2.name));
-
-        if let Some(parent) = self.cwd.parent() {
-            let mut files = Vec::with_capacity(1 + dirs.len() + none_dirs.len());
-
-            files.push(File {
-                name: "../".to_owned(),
-                path: parent.to_path_buf(),
-                is_dir: true,
-                is_hidden: false,
-                file_type: None,
-            });
-
-            files.extend(dirs);
-            files.extend(none_dirs);
-
-            self.files = files;
-        } else {
-            let mut files = Vec::with_capacity(dirs.len() + none_dirs.len());
-
-            files.extend(dirs);
-            files.extend(none_dirs);
-
-            self.files = files;
-        };
-
+        self.files = files;
         Ok(())
+    }
+}
+
+// Separate impl block for FileExplorer<LocalFileSystem> for backward compatibility
+impl FileExplorer<LocalFileSystem> {
+    /// Creates a new instance of `FileExplorer` with the default LocalFileSystem.
+    ///
+    /// This method initializes a `FileExplorer` with the current working directory.
+    /// By default, hidden files are not shown.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if the current working directory can not be listed.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let file_explorer = FileExplorer::new().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn new() -> Result<Self> {
+        let cwd = std::env::current_dir()?;
+        let filesystem = Arc::new(LocalFileSystem);
+
+        Self::with_fs(filesystem, cwd.to_string_lossy().to_string()).await
+    }
+
+    /// Creates a new instance of `FileExplorer` with a specific theme.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if the current working directory can not be listed.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::{FileExplorer, Theme};
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let file_explorer = FileExplorer::with_theme(Theme::default().add_default_title()).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub async fn with_theme(theme: Theme) -> Result<Self> {
+        let mut file_explorer = Self::new().await?;
+        file_explorer.theme = theme;
+        Ok(file_explorer)
     }
 }
 

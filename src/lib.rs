@@ -12,6 +12,9 @@ mod file_explorer;
 mod input;
 mod widget;
 
+pub mod filesystem;
+
 pub use file_explorer::{File, FileExplorer};
+pub use filesystem::{FileEntry, FileSystem, LocalFileSystem};
 pub use input::Input;
 pub use widget::Theme;

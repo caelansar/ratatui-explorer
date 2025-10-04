@@ -8,13 +8,13 @@ use ratatui::{
     widgets::{Block, Borders, HighlightSpacing, List, ListState, WidgetRef},
 };
 
-use crate::{File, FileExplorer};
+use crate::{filesystem::FileSystem, File, FileExplorer};
 
-type LineFactory = Arc<dyn Fn(&FileExplorer) -> Line<'static> + Send + Sync>;
+type LineFactory<F> = Arc<dyn Fn(&FileExplorer<F>) -> Line<'static> + Send + Sync>;
 
-pub struct Renderer<'a>(pub(crate) &'a FileExplorer);
+pub struct Renderer<'a, F: FileSystem>(pub(crate) &'a FileExplorer<F>);
 
-impl WidgetRef for Renderer<'_> {
+impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized,
@@ -56,7 +56,7 @@ impl WidgetRef for Renderer<'_> {
 
 impl File {
     /// Returns the text with the appropriate style to be displayed for the file.
-    fn text(&self, theme: &Theme) -> Text<'_> {
+    fn text<F: FileSystem>(&self, theme: &Theme<F>) -> Text<'_> {
         let style = if self.is_dir() {
             *theme.dir_style()
         } else {
@@ -75,12 +75,12 @@ impl File {
 /// and [`Theme::with_title_bottom`](#method.title_bottom).
 #[derive(Clone, educe::Educe)]
 #[educe(Debug, PartialEq, Eq, Hash)]
-pub struct Theme {
+pub struct Theme<F: FileSystem = crate::filesystem::LocalFileSystem> {
     block: Option<Block<'static>>,
     #[educe(Debug(ignore), PartialEq(ignore), Hash(ignore))]
-    title_top: Vec<LineFactory>,
+    title_top: Vec<LineFactory<F>>,
     #[educe(Debug(ignore), PartialEq(ignore), Hash(ignore))]
-    title_bottom: Vec<LineFactory>,
+    title_bottom: Vec<LineFactory<F>>,
     style: Style,
     item_style: Style,
     dir_style: Style,
@@ -91,7 +91,7 @@ pub struct Theme {
     scroll_padding: usize,
 }
 
-impl Theme {
+impl<F: FileSystem> Theme<F> {
     /// Create a new empty theme.
     ///
     /// The theme will not have any style set. To get a theme with the default style, use [`Theme::default`](#method.default).
@@ -157,7 +157,7 @@ impl Theme {
     #[inline]
     #[must_use = "method moves the value of self and returns the modified value"]
     pub fn add_default_title(self) -> Self {
-        self.with_title_top(|file_explorer: &FileExplorer| {
+        self.with_title_top(|file_explorer: &FileExplorer<F>| {
             Line::from(file_explorer.cwd().display().to_string())
         })
     }
@@ -342,7 +342,7 @@ impl Theme {
     #[must_use = "method moves the value of self and returns the modified value"]
     pub fn with_title_top(
         mut self,
-        title_top: impl Fn(&FileExplorer) -> Line<'static> + 'static + Send + Sync,
+        title_top: impl Fn(&FileExplorer<F>) -> Line<'static> + 'static + Send + Sync,
     ) -> Self {
         self.title_top.push(Arc::new(title_top));
         self
@@ -373,7 +373,7 @@ impl Theme {
     #[must_use = "method moves the value of self and returns the modified value"]
     pub fn with_title_bottom(
         mut self,
-        title_bottom: impl Fn(&FileExplorer) -> Line<'static> + 'static + Send + Sync,
+        title_bottom: impl Fn(&FileExplorer<F>) -> Line<'static> + 'static + Send + Sync,
     ) -> Self {
         self.title_bottom.push(Arc::new(title_bottom));
         self
@@ -445,7 +445,7 @@ impl Theme {
     /// Returns the generated top titles of the theme.
     #[inline]
     #[must_use]
-    pub fn title_top(&self, file_explorer: &FileExplorer) -> Vec<Line> {
+    pub fn title_top(&self, file_explorer: &FileExplorer<F>) -> Vec<Line> {
         self.title_top
             .iter()
             .map(|title_top| title_top(file_explorer))
@@ -455,7 +455,7 @@ impl Theme {
     /// Returns the generated bottom titles of the theme.
     #[inline]
     #[must_use]
-    pub fn title_bottom(&self, file_explorer: &FileExplorer) -> Vec<Line> {
+    pub fn title_bottom(&self, file_explorer: &FileExplorer<F>) -> Vec<Line> {
         self.title_bottom
             .iter()
             .map(|title_bottom| title_bottom(file_explorer))
@@ -463,7 +463,7 @@ impl Theme {
     }
 }
 
-impl Default for Theme {
+impl<F: FileSystem> Default for Theme<F> {
     /// Return a slightly customized default theme. To get a theme with no style set, use [`Theme::new`](#method.new).
     ///
     /// The theme will have a block with all borders, a white style for the items, a light blue style for the directories,
@@ -483,8 +483,8 @@ impl Default for Theme {
             item_style: Style::default().fg(Color::White),
             dir_style: Style::default().fg(Color::LightBlue),
             highlight_spacing: HighlightSpacing::Always,
-            highlight_item_style: Style::default().fg(Color::White).bg(Color::DarkGray),
-            highlight_dir_style: Style::default().fg(Color::LightBlue).bg(Color::DarkGray),
+            highlight_item_style: Style::default().fg(Color::White).bg(Color::Cyan),
+            highlight_dir_style: Style::default().fg(Color::LightBlue).bg(Color::Cyan),
             highlight_symbol: None,
             scroll_padding: 0,
         }
