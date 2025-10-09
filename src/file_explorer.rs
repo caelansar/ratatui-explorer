@@ -212,9 +212,25 @@ impl<F: FileSystem> FileExplorer<F> {
                 let parent = self.cwd.parent();
 
                 if let Some(parent) = parent {
+                    // Remember the current directory name to select it after navigating back
+                    let current_dir_name = self
+                        .cwd
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| format!("{}/", s));
+
                     self.cwd = parent.to_path_buf();
                     self.get_and_set_files().await?;
-                    self.selected = 0;
+
+                    // Try to select the directory we just came from
+                    if let Some(dir_name) = current_dir_name {
+                        if !self.select_file(&dir_name) {
+                            // If we can't find it (shouldn't happen), default to first item
+                            self.selected = 0;
+                        }
+                    } else {
+                        self.selected = 0;
+                    }
                 }
             }
             Input::Right => {
