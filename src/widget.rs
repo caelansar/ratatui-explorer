@@ -21,26 +21,12 @@ pub struct StatefulRenderer<'a, F: FileSystem>(pub(crate) &'a mut FileExplorer<F
 impl<F: FileSystem> StatefulRenderer<'_, F> {
     /// Render the file explorer widget with stateful tracking of scroll position.
     pub fn render(self, area: Rect, buf: &mut Buffer) {
-        // Filter files based on search filter
-        let filtered_files: Vec<(usize, &File)> = if let Some(filter) = self.0.search_filter() {
-            let filter_lower = filter.to_lowercase();
-            self.0
-                .files()
-                .iter()
-                .enumerate()
-                .filter(|(_, file)| file.name().to_lowercase().contains(&filter_lower))
-                .collect()
-        } else {
-            self.0.files().iter().enumerate().collect()
-        };
-
-        // Find the selected index in the filtered list
-        let filtered_selected = filtered_files
-            .iter()
-            .position(|(idx, _)| *idx == self.0.selected_idx());
+        // Get filtered files and selected index
+        let files = self.0.files();
+        let selected_idx = self.0.selected_idx();
 
         let mut state = ListState::default()
-            .with_selected(filtered_selected)
+            .with_selected(Some(selected_idx))
             .with_offset(self.0.scroll_offset());
 
         let highlight_style = if self.0.current().is_dir() {
@@ -49,15 +35,11 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
             self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(
-            filtered_files
-                .iter()
-                .map(|(_, file)| file.text(self.0.theme())),
-        )
-        .style(self.0.theme().style)
-        .highlight_spacing(self.0.theme().highlight_spacing.clone())
-        .highlight_style(highlight_style)
-        .scroll_padding(self.0.theme().scroll_padding);
+        let mut list = List::new(files.iter().map(|file| file.text(self.0.theme())))
+            .style(self.0.theme().style)
+            .highlight_spacing(self.0.theme().highlight_spacing.clone())
+            .highlight_style(highlight_style)
+            .scroll_padding(self.0.theme().scroll_padding);
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
             list = list.highlight_symbol(symbol);
@@ -88,26 +70,12 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
     where
         Self: Sized,
     {
-        // Filter files based on search filter
-        let filtered_files: Vec<(usize, &File)> = if let Some(filter) = self.0.search_filter() {
-            let filter_lower = filter.to_lowercase();
-            self.0
-                .files()
-                .iter()
-                .enumerate()
-                .filter(|(_, file)| file.name().to_lowercase().contains(&filter_lower))
-                .collect()
-        } else {
-            self.0.files().iter().enumerate().collect()
-        };
-
-        // Find the selected index in the filtered list
-        let filtered_selected = filtered_files
-            .iter()
-            .position(|(idx, _)| *idx == self.0.selected_idx());
+        // Get filtered files and selected index
+        let files = self.0.files();
+        let selected_idx = self.0.selected_idx();
 
         let mut state = ListState::default()
-            .with_selected(filtered_selected)
+            .with_selected(Some(selected_idx))
             .with_offset(self.0.scroll_offset());
 
         let highlight_style = if self.0.current().is_dir() {
@@ -116,15 +84,11 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
             self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(
-            filtered_files
-                .iter()
-                .map(|(_, file)| file.text(self.0.theme())),
-        )
-        .style(self.0.theme().style)
-        .highlight_spacing(self.0.theme().highlight_spacing.clone())
-        .highlight_style(highlight_style)
-        .scroll_padding(self.0.theme().scroll_padding);
+        let mut list = List::new(files.iter().map(|file| file.text(self.0.theme())))
+            .style(self.0.theme().style)
+            .highlight_spacing(self.0.theme().highlight_spacing.clone())
+            .highlight_style(highlight_style)
+            .scroll_padding(self.0.theme().scroll_padding);
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
             list = list.highlight_symbol(symbol);

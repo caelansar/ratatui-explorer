@@ -58,6 +58,7 @@ pub struct FileExplorer<F: FileSystem = LocalFileSystem> {
     filesystem: Arc<F>,
     cwd: PathBuf,
     files: Vec<File>,
+    filtered_files: Vec<(usize, File)>,
     show_hidden: bool,
     selected: usize,
     theme: Theme<F>,
@@ -95,6 +96,7 @@ impl<F: FileSystem> FileExplorer<F> {
             filesystem,
             cwd,
             files: vec![],
+            filtered_files: vec![],
             show_hidden: false,
             selected: 0,
             theme: Theme::default(),
@@ -223,22 +225,53 @@ impl<F: FileSystem> FileExplorer<F> {
 
         match input {
             Input::Up => {
-                self.selected = self.selected.wrapping_sub(1).min(self.files.len() - 1);
+                if !self.filtered_files.is_empty() {
+                    let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
+                    let new_filtered_idx = current_filtered_idx
+                        .wrapping_sub(1)
+                        .min(self.filtered_files.len() - 1);
+                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = *original_idx;
+                    }
+                }
             }
             Input::Down => {
-                self.selected = (self.selected + 1) % self.files.len();
+                if !self.filtered_files.is_empty() {
+                    let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
+                    let new_filtered_idx = (current_filtered_idx + 1) % self.filtered_files.len();
+                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = *original_idx;
+                    }
+                }
             }
             Input::Home => {
-                self.selected = 0;
+                if let Some((original_idx, _)) = self.filtered_files.first() {
+                    self.selected = *original_idx;
+                }
             }
             Input::End => {
-                self.selected = self.files.len() - 1;
+                if let Some((original_idx, _)) = self.filtered_files.last() {
+                    self.selected = *original_idx;
+                }
             }
             Input::PageUp => {
-                self.selected = self.selected.saturating_sub(SCROLL_COUNT);
+                if !self.filtered_files.is_empty() {
+                    let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
+                    let new_filtered_idx = current_filtered_idx.saturating_sub(SCROLL_COUNT);
+                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = *original_idx;
+                    }
+                }
             }
             Input::PageDown => {
-                self.selected = (self.selected + SCROLL_COUNT).min(self.files.len() - 1);
+                if !self.filtered_files.is_empty() {
+                    let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
+                    let new_filtered_idx =
+                        (current_filtered_idx + SCROLL_COUNT).min(self.filtered_files.len() - 1);
+                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = *original_idx;
+                    }
+                }
             }
             Input::Left => {
                 let parent = self.cwd.parent();
@@ -370,6 +403,7 @@ impl<F: FileSystem> FileExplorer<F> {
     #[inline]
     pub fn set_search_filter(&mut self, filter: Option<String>) {
         self.search_filter = filter;
+        self.filtered_files = self.compute_filtered_files();
     }
 
     /// Returns the current search filter, if any.
@@ -391,8 +425,31 @@ impl<F: FileSystem> FileExplorer<F> {
         self.search_filter.as_deref()
     }
 
-    /// Sets the selected file or directory index inside the current [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files
-    /// and directories if the file explorer.
+    /// Returns the cached filtered files with their original indices.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let mut file_explorer = FileExplorer::new().await?;
+    /// file_explorer.set_search_filter(Some("test".to_string()));
+    /// let filtered_files = file_explorer.filtered_files();
+    /// println!("Found {} filtered files", filtered_files.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn filtered_files(&self) -> &[(usize, File)] {
+        &self.filtered_files
+    }
+
+    /// Sets the selected file or directory index in the filtered view.
+    /// When no search filter is active, this works the same as before.
+    /// When a search filter is active, this accepts an index within the filtered list
+    /// and converts it to the corresponding original index.
     ///
     /// The file explorer add the parent directory at the beginning of the
     /// [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files, so setting the selected index to 0 will select the parent directory
@@ -400,8 +457,8 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// # Panics
     ///
-    /// Panics if `selected` is greater or equal to the number of files (plus the parent directory if it exist) in the current
-    /// working directory.
+    /// Panics if `selected` is greater or equal to the number of files in the current view
+    /// (filtered files if a filter is active, or all files if no filter).
     ///
     /// # Examples
     ///
@@ -438,8 +495,11 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     #[inline]
     pub fn set_selected_idx(&mut self, selected: usize) {
-        assert!(selected < self.files.len());
-        self.selected = selected;
+        assert!(selected < self.filtered_files.len());
+
+        if let Some((original_idx, _)) = self.filtered_files.get(selected) {
+            self.selected = *original_idx;
+        }
     }
 
     /// Returns the current file or directory selected.
@@ -552,6 +612,7 @@ impl<F: FileSystem> FileExplorer<F> {
 
     /// Returns the a [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files and directories in the current working directory
     /// of the file explorer, plus the parent directory if it exist.
+    /// When a search filter is active, returns only the filtered files.
     ///
     /// # Examples
     ///
@@ -576,12 +637,35 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     #[inline]
     #[must_use]
-    pub const fn files(&self) -> &Vec<File> {
+    pub fn files(&self) -> Vec<&File> {
+        self.filtered_files.iter().map(|(_, file)| file).collect()
+    }
+
+    /// Returns all files and directories in the current working directory
+    /// without any filtering applied. This is useful when you need access
+    /// to the complete file list regardless of search filters.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// file_explorer.set_search_filter(Some("test".to_string()));
+    ///
+    /// let all_files = file_explorer.all_files();
+    /// let filtered_files = file_explorer.files();
+    /// // all_files.len() >= filtered_files.len()
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn all_files(&self) -> &Vec<File> {
         &self.files
     }
 
-    /// Returns the index of the selected file or directory in the current [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files
-    /// and directories in the current working directory of the file explorer.
+    /// Returns the index of the selected file or directory in the filtered view.
+    /// When no search filter is active, this returns the same as the original index.
+    /// When a search filter is active, this returns the index within the filtered list.
     ///
     /// # Examples
     ///
@@ -590,7 +674,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// /
     /// ├── .git
     /// └── Documents
-    ///     ├── passport.png  <- selected (index 2)
+    ///     ├── passport.png  <- selected
     ///     └── resume.pdf
     /// ```
     /// You can get the selected index like this:
@@ -609,7 +693,28 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     #[inline]
     #[must_use]
-    pub const fn selected_idx(&self) -> usize {
+    pub fn selected_idx(&self) -> usize {
+        self.filtered_selected_idx().unwrap_or(0)
+    }
+
+    /// Returns the original index of the selected file in the complete file list.
+    /// This is useful when you need to know the actual position in the unfiltered list.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// file_explorer.set_search_filter(Some("test".to_string()));
+    ///
+    /// let filtered_idx = file_explorer.selected_idx();
+    /// let original_idx = file_explorer.original_selected_idx();
+    /// // original_idx >= filtered_idx
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn original_selected_idx(&self) -> usize {
         self.selected
     }
 
@@ -645,6 +750,29 @@ impl<F: FileSystem> FileExplorer<F> {
     #[inline]
     pub(crate) fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
+    }
+
+    /// Compute filtered files with their original indices, returning owned File objects.
+    /// This method clones the files to cache them in the filtered_files field.
+    fn compute_filtered_files(&self) -> Vec<(usize, File)> {
+        if let Some(filter) = self.search_filter() {
+            let filter_lower = filter.to_lowercase();
+            self.files
+                .iter()
+                .enumerate()
+                .filter(|(_, file)| file.name().to_lowercase().contains(&filter_lower))
+                .map(|(idx, file)| (idx, file.clone()))
+                .collect()
+        } else {
+            self.files.iter().cloned().enumerate().collect()
+        }
+    }
+
+    /// Convert the current selected index (which is stored as original index) to filtered index.
+    fn filtered_selected_idx(&self) -> Option<usize> {
+        self.filtered_files
+            .iter()
+            .position(|(original_idx, _)| *original_idx == self.selected)
     }
 
     /// Get the files and directories in the current working directory and set them in the file explorer.
@@ -684,6 +812,7 @@ impl<F: FileSystem> FileExplorer<F> {
         }
 
         self.files = files;
+        self.filtered_files = self.compute_filtered_files();
         Ok(())
     }
 }
