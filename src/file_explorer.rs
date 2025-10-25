@@ -61,6 +61,8 @@ pub struct FileExplorer<F: FileSystem = LocalFileSystem> {
     show_hidden: bool,
     selected: usize,
     theme: Theme<F>,
+    search_filter: Option<String>,
+    scroll_offset: usize,
 }
 
 impl<F: FileSystem> FileExplorer<F> {
@@ -96,6 +98,8 @@ impl<F: FileSystem> FileExplorer<F> {
             show_hidden: false,
             selected: 0,
             theme: Theme::default(),
+            search_filter: None,
+            scroll_offset: 0,
         };
 
         file_explorer.get_and_set_files().await?;
@@ -129,6 +133,34 @@ impl<F: FileSystem> FileExplorer<F> {
     #[must_use]
     pub const fn widget(&self) -> impl WidgetRef + '_ {
         Renderer(self)
+    }
+
+    /// Build a stateful widget that properly tracks scroll position.
+    /// This is useful when you need to maintain scroll state across renders,
+    /// particularly for scrollbar integration.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui::{Terminal, backend::CrosstermBackend};
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
+    ///
+    /// loop {
+    ///     terminal.draw(|f| {
+    ///         let area = f.area();
+    ///         file_explorer.widget_stateful().render(area, f.buffer_mut());
+    ///     }).unwrap();
+    ///
+    ///     // ...
+    /// }
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn widget_stateful(&mut self) -> crate::widget::StatefulRenderer<'_, F> {
+        crate::widget::StatefulRenderer(self)
     }
 
     /// Handles input from user and updates the state of the file explorer.
@@ -314,6 +346,49 @@ impl<F: FileSystem> FileExplorer<F> {
     #[inline]
     pub fn set_theme(&mut self, theme: Theme<F>) {
         self.theme = theme;
+    }
+
+    /// Sets the search filter to filter files and directories by name.
+    ///
+    /// When a search filter is set, only files and directories whose names contain
+    /// the filter string (case-insensitive) will be displayed. Set to `None` to clear
+    /// the filter and show all files.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// let mut file_explorer = FileExplorer::new().unwrap();
+    ///
+    /// // Filter to show only files containing "test"
+    /// file_explorer.set_search_filter(Some("test".to_string()));
+    ///
+    /// // Clear the filter
+    /// file_explorer.set_search_filter(None);
+    /// ```
+    #[inline]
+    pub fn set_search_filter(&mut self, filter: Option<String>) {
+        self.search_filter = filter;
+    }
+
+    /// Returns the current search filter, if any.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// assert_eq!(file_explorer.search_filter(), None);
+    ///
+    /// file_explorer.set_search_filter(Some("test".to_string()));
+    /// assert_eq!(file_explorer.search_filter(), Some("test"));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn search_filter(&self) -> Option<&str> {
+        self.search_filter.as_deref()
     }
 
     /// Sets the selected file or directory index inside the current [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files
@@ -553,6 +628,23 @@ impl<F: FileSystem> FileExplorer<F> {
     #[must_use]
     pub const fn theme(&self) -> &Theme<F> {
         &self.theme
+    }
+
+    /// Returns the current scroll offset of the file explorer.
+    ///
+    /// This represents the index of the first visible item in the list.
+    #[inline]
+    #[must_use]
+    pub const fn scroll_offset(&self) -> usize {
+        self.scroll_offset
+    }
+
+    /// Sets the scroll offset for the file explorer.
+    ///
+    /// This is used internally by the widget renderer to maintain scroll state.
+    #[inline]
+    pub(crate) fn set_scroll_offset(&mut self, offset: usize) {
+        self.scroll_offset = offset;
     }
 
     /// Get the files and directories in the current working directory and set them in the file explorer.

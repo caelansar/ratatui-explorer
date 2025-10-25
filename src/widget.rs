@@ -5,7 +5,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, HighlightSpacing, List, ListState, WidgetRef},
+    widgets::{Block, Borders, HighlightSpacing, List, ListState, StatefulWidget, WidgetRef},
 };
 
 use crate::{filesystem::FileSystem, File, FileExplorer};
@@ -14,12 +14,34 @@ type LineFactory<F> = Arc<dyn Fn(&FileExplorer<F>) -> Line<'static> + Send + Syn
 
 pub struct Renderer<'a, F: FileSystem>(pub(crate) &'a FileExplorer<F>);
 
-impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
-    fn render_ref(&self, area: Rect, buf: &mut Buffer)
-    where
-        Self: Sized,
-    {
-        let mut state = ListState::default().with_selected(Some(self.0.selected_idx()));
+/// A stateful renderer that can be used with render_stateful_widget.
+/// This allows tracking and updating the scroll offset state.
+pub struct StatefulRenderer<'a, F: FileSystem>(pub(crate) &'a mut FileExplorer<F>);
+
+impl<F: FileSystem> StatefulRenderer<'_, F> {
+    /// Render the file explorer widget with stateful tracking of scroll position.
+    pub fn render(self, area: Rect, buf: &mut Buffer) {
+        // Filter files based on search filter
+        let filtered_files: Vec<(usize, &File)> = if let Some(filter) = self.0.search_filter() {
+            let filter_lower = filter.to_lowercase();
+            self.0
+                .files()
+                .iter()
+                .enumerate()
+                .filter(|(_, file)| file.name().to_lowercase().contains(&filter_lower))
+                .collect()
+        } else {
+            self.0.files().iter().enumerate().collect()
+        };
+
+        // Find the selected index in the filtered list
+        let filtered_selected = filtered_files
+            .iter()
+            .position(|(idx, _)| *idx == self.0.selected_idx());
+
+        let mut state = ListState::default()
+            .with_selected(filtered_selected)
+            .with_offset(self.0.scroll_offset());
 
         let highlight_style = if self.0.current().is_dir() {
             self.0.theme().highlight_dir_style
@@ -27,11 +49,82 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
             self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(self.0.files().iter().map(|file| file.text(self.0.theme())))
-            .style(self.0.theme().style)
-            .highlight_spacing(self.0.theme().highlight_spacing.clone())
-            .highlight_style(highlight_style)
-            .scroll_padding(self.0.theme().scroll_padding);
+        let mut list = List::new(
+            filtered_files
+                .iter()
+                .map(|(_, file)| file.text(self.0.theme())),
+        )
+        .style(self.0.theme().style)
+        .highlight_spacing(self.0.theme().highlight_spacing.clone())
+        .highlight_style(highlight_style)
+        .scroll_padding(self.0.theme().scroll_padding);
+
+        if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
+            list = list.highlight_symbol(symbol);
+        }
+
+        if let Some(block) = self.0.theme().block.as_ref() {
+            let mut block = block.clone();
+
+            for title_top in self.0.theme().title_top(self.0) {
+                block = block.title_top(title_top);
+            }
+            for title_bottom in self.0.theme().title_bottom(self.0) {
+                block = block.title_bottom(title_bottom);
+            }
+
+            list = list.block(block);
+        }
+
+        list.render(area, buf, &mut state);
+
+        // Update scroll offset after rendering
+        self.0.set_scroll_offset(state.offset());
+    }
+}
+
+impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
+    fn render_ref(&self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        // Filter files based on search filter
+        let filtered_files: Vec<(usize, &File)> = if let Some(filter) = self.0.search_filter() {
+            let filter_lower = filter.to_lowercase();
+            self.0
+                .files()
+                .iter()
+                .enumerate()
+                .filter(|(_, file)| file.name().to_lowercase().contains(&filter_lower))
+                .collect()
+        } else {
+            self.0.files().iter().enumerate().collect()
+        };
+
+        // Find the selected index in the filtered list
+        let filtered_selected = filtered_files
+            .iter()
+            .position(|(idx, _)| *idx == self.0.selected_idx());
+
+        let mut state = ListState::default()
+            .with_selected(filtered_selected)
+            .with_offset(self.0.scroll_offset());
+
+        let highlight_style = if self.0.current().is_dir() {
+            self.0.theme().highlight_dir_style
+        } else {
+            self.0.theme().highlight_item_style
+        };
+
+        let mut list = List::new(
+            filtered_files
+                .iter()
+                .map(|(_, file)| file.text(self.0.theme())),
+        )
+        .style(self.0.theme().style)
+        .highlight_spacing(self.0.theme().highlight_spacing.clone())
+        .highlight_style(highlight_style)
+        .scroll_padding(self.0.theme().scroll_padding);
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
             list = list.highlight_symbol(symbol);
