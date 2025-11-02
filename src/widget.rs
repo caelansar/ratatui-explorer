@@ -35,11 +35,14 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
             self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(files.iter().map(|file| file.text(self.0.theme())))
-            .style(self.0.theme().style)
-            .highlight_spacing(self.0.theme().highlight_spacing.clone())
-            .highlight_style(highlight_style)
-            .scroll_padding(self.0.theme().scroll_padding);
+        let mut list = List::new(files.iter().map(|file| {
+            let is_selected = self.0.is_file_selected(file);
+            file.text(self.0.theme(), is_selected)
+        }))
+        .style(self.0.theme().style)
+        .highlight_spacing(self.0.theme().highlight_spacing.clone())
+        .highlight_style(highlight_style)
+        .scroll_padding(self.0.theme().scroll_padding);
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
             list = list.highlight_symbol(symbol);
@@ -84,11 +87,14 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
             self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(files.iter().map(|file| file.text(self.0.theme())))
-            .style(self.0.theme().style)
-            .highlight_spacing(self.0.theme().highlight_spacing.clone())
-            .highlight_style(highlight_style)
-            .scroll_padding(self.0.theme().scroll_padding);
+        let mut list = List::new(files.iter().map(|file| {
+            let is_selected = self.0.is_file_selected(file);
+            file.text(self.0.theme(), is_selected)
+        }))
+        .style(self.0.theme().style)
+        .highlight_spacing(self.0.theme().highlight_spacing.clone())
+        .highlight_style(highlight_style)
+        .scroll_padding(self.0.theme().scroll_padding);
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
             list = list.highlight_symbol(symbol);
@@ -113,13 +119,23 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
 
 impl File {
     /// Returns the text with the appropriate style to be displayed for the file.
-    fn text<F: FileSystem>(&self, theme: &Theme<F>) -> Text<'_> {
+    fn text<F: FileSystem>(&self, theme: &Theme<F>, is_selected: bool) -> Text<'_> {
         let style = if self.is_dir() {
             *theme.dir_style()
         } else {
             *theme.item_style()
         };
-        Span::styled(self.name(), style).into()
+
+        if is_selected {
+            let selected_style = style.patch(Style::default().fg(Color::Cyan));
+            Span::styled(
+                format!("{}{}", theme.selected_marker(), self.name()),
+                selected_style,
+            )
+            .into()
+        } else {
+            Span::styled(self.name().to_string(), style).into()
+        }
     }
 }
 
@@ -146,6 +162,7 @@ pub struct Theme<F: FileSystem = crate::filesystem::LocalFileSystem> {
     highlight_dir_style: Style,
     highlight_symbol: Option<String>,
     scroll_padding: usize,
+    selected_marker: String,
 }
 
 impl<F: FileSystem> Theme<F> {
@@ -159,7 +176,7 @@ impl<F: FileSystem> Theme<F> {
     /// let theme = Theme::new();
     /// ```
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             block: None,
             title_top: Vec::new(),
@@ -172,6 +189,7 @@ impl<F: FileSystem> Theme<F> {
             highlight_dir_style: Style::new(),
             highlight_symbol: None,
             scroll_padding: 0,
+            selected_marker: "[✓] ".to_string(),
         }
     }
 
@@ -374,6 +392,22 @@ impl<F: FileSystem> Theme<F> {
         self
     }
 
+    /// Sets the marker string to display before selected files.
+    ///
+    /// By default, the marker is "[✓] ".
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use ratatui_explorer::Theme;
+    /// let theme = Theme::default().with_selected_marker("[x] ");
+    /// ```
+    #[inline]
+    #[must_use = "method moves the value of self and returns the modified value"]
+    pub fn with_selected_marker(mut self, marker: impl Into<String>) -> Self {
+        self.selected_marker = marker.into();
+        self
+    }
+
     /// Add a top title factory to the theme.
     ///
     /// `title_top` is a function that take a reference to the current [`FileExplorer`] and returns
@@ -499,6 +533,13 @@ impl<F: FileSystem> Theme<F> {
         self.scroll_padding
     }
 
+    /// Returns the marker string displayed before selected files.
+    #[inline]
+    #[must_use]
+    pub fn selected_marker(&self) -> &str {
+        &self.selected_marker
+    }
+
     /// Returns the generated top titles of the theme.
     #[inline]
     #[must_use]
@@ -544,6 +585,7 @@ impl<F: FileSystem> Default for Theme<F> {
             highlight_dir_style: Style::default().fg(Color::LightBlue).bg(Color::Cyan),
             highlight_symbol: None,
             scroll_padding: 0,
+            selected_marker: "[✓] ".to_string(),
         }
     }
 }

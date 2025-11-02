@@ -1,4 +1,4 @@
-use std::{fs::FileType, io::Result, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, fs::FileType, io::Result, path::PathBuf, sync::Arc};
 
 use ratatui::widgets::WidgetRef;
 
@@ -64,6 +64,7 @@ pub struct FileExplorer<F: FileSystem = LocalFileSystem> {
     theme: Theme<F>,
     search_filter: Option<String>,
     scroll_offset: usize,
+    selected_paths: HashSet<PathBuf>,
 }
 
 impl<F: FileSystem> FileExplorer<F> {
@@ -102,6 +103,7 @@ impl<F: FileSystem> FileExplorer<F> {
             theme: Theme::default(),
             search_filter: None,
             scroll_offset: 0,
+            selected_paths: HashSet::new(),
         };
 
         file_explorer.get_and_set_files().await?;
@@ -750,6 +752,77 @@ impl<F: FileSystem> FileExplorer<F> {
     #[inline]
     pub(crate) fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
+    }
+
+    /// Sets the paths of files that should be displayed as selected.
+    ///
+    /// This allows external state management of file selection, useful for
+    /// multi-file operations like batch copying or deleting.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::collections::HashSet;
+    /// use std::path::PathBuf;
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let mut file_explorer = FileExplorer::new().await?;
+    ///
+    /// let mut selected = HashSet::new();
+    /// selected.insert(PathBuf::from("/home/user/file1.txt"));
+    /// selected.insert(PathBuf::from("/home/user/file2.txt"));
+    ///
+    /// file_explorer.set_selected_paths(selected);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn set_selected_paths(&mut self, paths: HashSet<PathBuf>) {
+        self.selected_paths = paths;
+    }
+
+    /// Returns a reference to the set of selected file paths.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let file_explorer = FileExplorer::new().await?;
+    /// let selected = file_explorer.selected_paths();
+    /// println!("Number of selected files: {}", selected.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn selected_paths(&self) -> &HashSet<PathBuf> {
+        &self.selected_paths
+    }
+
+    /// Checks if a specific file is marked as selected.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # async fn example() -> std::io::Result<()> {
+    /// let file_explorer = FileExplorer::new().await?;
+    /// let current_file = file_explorer.current();
+    ///
+    /// if file_explorer.is_file_selected(current_file) {
+    ///     println!("Current file is selected");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn is_file_selected(&self, file: &File) -> bool {
+        self.selected_paths.contains(&file.path)
     }
 
     /// Compute filtered files with their original indices, returning owned File objects.
