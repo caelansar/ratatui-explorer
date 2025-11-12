@@ -29,10 +29,22 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
             .with_selected(Some(selected_idx))
             .with_offset(self.0.scroll_offset());
 
-        let highlight_style = if self.0.current().is_dir() {
-            self.0.theme().highlight_dir_style
+        // Check if current item is selected
+        let current_is_selected = self.0.is_file_selected(self.0.current());
+
+        let highlight_style = if current_is_selected {
+            // If current item is selected, always use cyan foreground
+            if self.0.current().is_dir() {
+                self.0.theme().highlight_dir_style.fg(Color::Cyan)
+            } else {
+                self.0.theme().highlight_item_style.fg(Color::Cyan)
+            }
         } else {
-            self.0.theme().highlight_item_style
+            if self.0.current().is_dir() {
+                self.0.theme().highlight_dir_style
+            } else {
+                self.0.theme().highlight_item_style
+            }
         };
 
         let mut list = List::new(files.iter().map(|file| {
@@ -81,10 +93,22 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
             .with_selected(Some(selected_idx))
             .with_offset(self.0.scroll_offset());
 
-        let highlight_style = if self.0.current().is_dir() {
-            self.0.theme().highlight_dir_style
+        // Check if current item is selected
+        let current_is_selected = self.0.is_file_selected(self.0.current());
+
+        let highlight_style = if current_is_selected {
+            // If current item is selected, always use cyan foreground
+            if self.0.current().is_dir() {
+                self.0.theme().highlight_dir_style.fg(Color::Cyan)
+            } else {
+                self.0.theme().highlight_item_style.fg(Color::Cyan)
+            }
         } else {
-            self.0.theme().highlight_item_style
+            if self.0.current().is_dir() {
+                self.0.theme().highlight_dir_style
+            } else {
+                self.0.theme().highlight_item_style
+            }
         };
 
         let mut list = List::new(files.iter().map(|file| {
