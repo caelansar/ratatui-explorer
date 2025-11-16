@@ -71,4 +71,7 @@ pub trait FileSystem: Send + Sync {
     ///
     /// Returns `None` if the path is the root directory or has no parent.
     fn parent(&self, path: &str) -> Option<String>;
+
+    /// Delete a file at the given path.
+    async fn delete(&self, path: &str) -> Result<()>;
 }

@@ -311,6 +311,26 @@ impl<F: FileSystem> FileExplorer<F> {
                 }
             }
             Input::ToggleShowHidden => self.set_show_hidden(!self.show_hidden).await?,
+            Input::Delete => {
+                // Get the currently selected file
+                let current_file = &self.files[self.selected];
+
+                // Skip deletion for directories and parent directory (..)
+                if !current_file.is_dir {
+                    let file_path = current_file.path.to_string_lossy().to_string();
+
+                    // Attempt to delete the file
+                    self.filesystem.delete(&file_path).await?;
+
+                    // Refresh the file list
+                    self.get_and_set_files().await?;
+
+                    // Adjust selection: stay on the same index if possible, or move to the last item
+                    if self.selected >= self.files.len() && !self.files.is_empty() {
+                        self.selected = self.files.len() - 1;
+                    }
+                }
+            }
             Input::None => (),
         }
 

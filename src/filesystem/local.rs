@@ -126,4 +126,13 @@ impl FileSystem for LocalFileSystem {
             .parent()
             .map(|p| p.to_string_lossy().to_string())
     }
+
+    async fn delete(&self, path: &str) -> Result<()> {
+        tokio::time::timeout(Duration::from_secs(5), tokio::fs::remove_file(path))
+            .await
+            .map_err(|_| Error::new(ErrorKind::TimedOut, "Timeout deleting file"))?
+            .map_err(|e| e)?;
+
+        Ok(())
+    }
 }

@@ -29,6 +29,7 @@ impl From<&Event> for Input {
                     KeyCode::End => Input::End,
                     KeyCode::PageUp => Input::PageUp,
                     KeyCode::PageDown => Input::PageDown,
+                    KeyCode::Char('d') => Input::Delete,
                     _ => Input::None,
                 };
 

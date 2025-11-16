@@ -19,6 +19,7 @@ impl From<&Event> for Input {
                 Key::PageUp => Input::PageUp,
                 Key::PageDown => Input::PageDown,
                 Key::Ctrl('h') => Input::ToggleShowHidden,
+                Key::Char('d') => Input::Delete,
                 _ => Input::None,
             },
             _ => Input::None,
