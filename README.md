@@ -50,7 +50,7 @@ Install the libraries in your `Cargo.toml` file:
 cargo add ratatui ratatui-explorer crossterm
 ```
 Then inside your `main.rs` file:
-```rust no_run
+```rust,no_run,ignore
 use std::io::{self, stdout};
 
 use crossterm::{
@@ -62,7 +62,8 @@ use ratatui::prelude::*;
 
 use ratatui_explorer::{FileExplorer, Theme};
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
 
@@ -70,7 +71,7 @@ fn main() -> io::Result<()> {
 
     // Create a new file explorer with the default theme and title.
     let theme = Theme::default().add_default_title();
-    let mut file_explorer = FileExplorer::with_theme(theme)?;
+    let mut file_explorer = FileExplorer::with_theme(theme).await?;
 
     loop {
         // Render the file explorer widget.
@@ -86,7 +87,7 @@ fn main() -> io::Result<()> {
             }
         }
         // Handle the event in the file explorer.
-        file_explorer.handle(&event)?;
+        file_explorer.handle(&event).await?;
     }
 
     disable_raw_mode()?;
@@ -101,7 +102,7 @@ You can customize the theme of the file explorer widget by using the `Theme` str
 use ratatui::{prelude::*, widgets::*};
 use ratatui_explorer::Theme;
 
-let theme = Theme::default()
+let theme: Theme = Theme::default()
     .add_default_title()
     .with_title_bottom(|fe| format!("[{} files]", fe.files().len()).into())
     .with_block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded))
@@ -116,7 +117,7 @@ The following bindings are used by default for [crossterm](https://docs.rs/cross
 [termion](https://docs.rs/termion/latest/termion/) and [termwiz](https://docs.rs/termwiz/latest/termwiz/).
 
 | Binding                           | Action                                     |
-|-----------------------------------|--------------------------------------------|
+| --------------------------------- | ------------------------------------------ |
 | `j`, `<DownArrow>`                | Move the selection down                    |
 | `k`, `<UpArrow>`                  | Move the selection up                      |
 | `h`, `<LeftArrow>`, `<Backspace>` | Go to the parent directory                 |

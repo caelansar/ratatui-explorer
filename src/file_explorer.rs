@@ -24,8 +24,10 @@ use crate::{
 /// ```no_run
 /// use ratatui_explorer::FileExplorer;
 ///
-/// let file_explorer = FileExplorer::new().unwrap();
+/// # tokio_test::block_on(async {
+/// let file_explorer = FileExplorer::new().await.unwrap();
 /// let widget = file_explorer.widget();
+/// # })
 /// ```
 ///
 /// Handling user input:
@@ -36,9 +38,11 @@ use crate::{
 /// # }
 /// use ratatui_explorer::FileExplorer;
 ///
-/// let mut file_explorer = FileExplorer::new().unwrap();
+/// # tokio_test::block_on(async {
+/// let mut file_explorer = FileExplorer::new().await.unwrap();
 /// let event = get_event(); // Get the event from the terminal (with crossterm, termion or termwiz)
-/// file_explorer.handle(event).unwrap();
+/// file_explorer.handle(event).await.unwrap();
+/// # })
 /// ```
 ///
 /// Accessing information about the current file selected and or the current working directory:
@@ -46,12 +50,14 @@ use crate::{
 /// ```no_run
 /// use ratatui_explorer::FileExplorer;
 ///
-/// let file_explorer = FileExplorer::new().unwrap();
+/// # tokio_test::block_on(async {
+/// let file_explorer = FileExplorer::new().await.unwrap();
 ///
 /// let current_file = file_explorer.current();
 /// let current_working_directory = file_explorer.cwd();
 /// println!("Current Directory: {}", current_working_directory.display());
 /// println!("Name: {}", current_file.name());
+/// # })
 /// ```
 #[derive(Debug, Clone)]
 pub struct FileExplorer<F: FileSystem = LocalFileSystem> {
@@ -120,7 +126,8 @@ impl<F: FileSystem> FileExplorer<F> {
     /// use ratatui::{Terminal, backend::CrosstermBackend};
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
     ///
@@ -131,7 +138,9 @@ impl<F: FileSystem> FileExplorer<F> {
     ///     }).unwrap();
     ///
     ///     // ...
+    /// #   break;
     /// }
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -149,7 +158,8 @@ impl<F: FileSystem> FileExplorer<F> {
     /// use ratatui::{Terminal, backend::CrosstermBackend};
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     /// let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
     ///
     /// loop {
@@ -159,7 +169,9 @@ impl<F: FileSystem> FileExplorer<F> {
     ///     }).unwrap();
     ///
     ///     // ...
+    /// #   break;
     /// }
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -203,6 +215,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::{FileExplorer, Input};
     ///
+    /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
@@ -219,6 +232,7 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// file_explorer.handle(Input::Right).await.unwrap();
     /// assert_eq!(file_explorer.cwd().display().to_string(), "/Documents");
+    /// # })
     /// ```
     pub async fn handle<I: Into<Input>>(&mut self, input: I) -> Result<()> {
         const SCROLL_COUNT: usize = 12;
@@ -348,10 +362,12 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
+    /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// file_explorer.set_cwd("/Documents").await.unwrap();
     /// assert_eq!(file_explorer.cwd().display().to_string(), "/Documents");
+    /// # })
     /// ```
     #[inline]
     pub async fn set_cwd<P: Into<PathBuf>>(&mut self, cwd: P) -> Result<()> {
@@ -373,10 +389,12 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
+    /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// file_explorer.set_show_hidden(true).await.unwrap();
     /// assert_eq!(file_explorer.show_hidden(), true);
+    /// # })
     /// ```
     #[inline]
     pub async fn set_show_hidden(&mut self, show_hidden: bool) -> Result<()> {
@@ -394,9 +412,11 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::{FileExplorer, Theme};
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// file_explorer.set_theme(Theme::default().add_default_title());
+    /// # })
     /// ```
     #[inline]
     pub fn set_theme(&mut self, theme: Theme<F>) {
@@ -414,13 +434,15 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// // Filter to show only files containing "test"
     /// file_explorer.set_search_filter(Some("test".to_string()));
     ///
     /// // Clear the filter
     /// file_explorer.set_search_filter(None);
+    /// # })
     /// ```
     #[inline]
     pub fn set_search_filter(&mut self, filter: Option<String>) {
@@ -435,11 +457,13 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     /// assert_eq!(file_explorer.search_filter(), None);
     ///
     /// file_explorer.set_search_filter(Some("test".to_string()));
     /// assert_eq!(file_explorer.search_filter(), Some("test"));
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -496,7 +520,8 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
@@ -507,14 +532,10 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// file_explorer.set_selected_idx(1);
     /// assert_eq!(file_explorer.current().path().display().to_string(), "/Documents");
-    ///
-    /// #[test]
-    /// #[should_panic]
-    /// fn index_out_of_bound() {
-    ///    let mut file_explorer = FileExplorer::new().unwrap();
-    ///    file_explorer.set_selected_idx(4);
-    /// }
+    /// # })
     /// ```
+    ///
+    /// Note: Attempting to set an index >= the number of files will cause a panic.
     #[inline]
     pub fn set_selected_idx(&mut self, selected: usize) {
         assert!(selected < self.filtered_files.len());
@@ -540,12 +561,14 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
     /// let file = file_explorer.current();
     /// assert_eq!(file.name(), "passport.png");
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -597,12 +620,14 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
     /// let cwd = file_explorer.cwd();
     /// assert_eq!(cwd.display().to_string(), "/Documents");
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -618,13 +643,15 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// // By default, hidden files are not shown.
     /// assert_eq!(file_explorer.show_hidden(), false);
     ///
-    /// file_explorer.set_show_hidden(true);
+    /// file_explorer.set_show_hidden(true).await.unwrap();
     /// assert_eq!(file_explorer.show_hidden(), true);
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -650,12 +677,14 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
     /// let files = file_explorer.files();
     /// assert_eq!(files.len(), 4); // 3 files/directory and the parent directory
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -672,12 +701,14 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     /// file_explorer.set_search_filter(Some("test".to_string()));
     ///
     /// let all_files = file_explorer.all_files();
     /// let filtered_files = file_explorer.files();
     /// // all_files.len() >= filtered_files.len()
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -703,7 +734,8 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
@@ -712,6 +744,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// // Because the file explorer add the parent directory at the beginning
     /// // of the [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files, the selected index will be 2.
     /// assert_eq!(selected_idx, 2);
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -727,12 +760,14 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let mut file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
     /// file_explorer.set_search_filter(Some("test".to_string()));
     ///
     /// let filtered_idx = file_explorer.selected_idx();
     /// let original_idx = file_explorer.original_selected_idx();
     /// // original_idx >= filtered_idx
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -747,9 +782,11 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use ratatui_explorer::{FileExplorer, Theme};
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// assert_eq!(file_explorer.theme(), &Theme::default());
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -988,12 +1025,14 @@ impl File {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
     /// let file = file_explorer.current();
     /// assert_eq!(file.name(), "passport.png");
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -1016,12 +1055,14 @@ impl File {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
     /// let file = file_explorer.current();
     /// assert_eq!(file.path().display().to_string(), "/Documents/passport.png");
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -1044,7 +1085,8 @@ impl File {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
@@ -1055,6 +1097,7 @@ impl File {
     ///
     /// let file = file_explorer.current();
     /// assert_eq!(file.is_dir(), true);
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -1077,7 +1120,8 @@ impl File {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
@@ -1088,6 +1132,7 @@ impl File {
     ///
     /// let file = file_explorer.current();
     /// assert_eq!(file.is_file(), false);
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -1110,7 +1155,8 @@ impl File {
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
@@ -1121,6 +1167,7 @@ impl File {
     ///
     /// let file = file_explorer.current();
     /// assert_eq!(file.is_hidden(), true);
+    /// # })
     /// ```
     #[inline]
     #[must_use]
@@ -1145,7 +1192,8 @@ impl File {
     ///
     /// use ratatui_explorer::FileExplorer;
     ///
-    /// let file_explorer = FileExplorer::new().unwrap();
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// /* user select `password.png` */
     ///
@@ -1158,6 +1206,7 @@ impl File {
     /// let file = file_explorer.current();
     /// assert_eq!(file.file_type().unwrap().is_file(), false);
     /// assert_eq!(file.file_type().unwrap().is_socket(), false);
+    /// # })
     /// ```
     #[inline]
     #[must_use]
