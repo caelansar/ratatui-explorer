@@ -2,10 +2,12 @@ use std::sync::Arc;
 
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
-    style::{Color, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, HighlightSpacing, List, ListState, StatefulWidget, WidgetRef},
+    layout::{Constraint, Rect},
+    style::{Color, Modifier, Style},
+    text::Line,
+    widgets::{
+        Block, Borders, Cell, HighlightSpacing, Row, StatefulWidget, Table, TableState, WidgetRef,
+    },
 };
 
 use crate::{filesystem::FileSystem, File, FileExplorer};
@@ -25,39 +27,62 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
         let files = self.0.files();
         let selected_idx = self.0.selected_idx();
 
-        let mut state = ListState::default()
+        let mut state = TableState::default()
             .with_selected(Some(selected_idx))
             .with_offset(self.0.scroll_offset());
 
         // Check if current item is selected
-        let current_is_selected = self.0.is_file_selected(self.0.current());
+        let current = self.0.current();
+        let current_is_selected = self.0.is_file_selected(current);
 
-        let highlight_style = if current_is_selected {
-            // If current item is selected, always use cyan foreground
-            if self.0.current().is_dir() {
-                self.0.theme().highlight_dir_style.fg(Color::Cyan)
-            } else {
-                self.0.theme().highlight_item_style.fg(Color::Cyan)
-            }
+        // Choose highlight style based on whether current item is a directory
+        let base_highlight_style = if current.is_dir() {
+            self.0.theme().highlight_dir_style
         } else {
-            if self.0.current().is_dir() {
-                self.0.theme().highlight_dir_style
-            } else {
-                self.0.theme().highlight_item_style
-            }
+            self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(files.iter().map(|file| {
-            let is_selected = self.0.is_file_selected(file);
-            file.text(self.0.theme(), is_selected)
-        }))
-        .style(self.0.theme().style)
-        .highlight_spacing(self.0.theme().highlight_spacing.clone())
-        .highlight_style(highlight_style)
-        .scroll_padding(self.0.theme().scroll_padding);
+        let highlight_style = if current_is_selected {
+            base_highlight_style.fg(Color::Cyan)
+        } else {
+            base_highlight_style
+        };
+
+        // Create table rows
+        let rows: Vec<Row> = files
+            .iter()
+            .map(|file| {
+                let is_selected = self.0.is_file_selected(file);
+                file.to_row(self.0.theme(), is_selected)
+            })
+            .collect();
+
+        // Create header
+        let header = Row::new(vec![
+            Cell::from("Permissions").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from("Name").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from("Size").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from("Modified At").style(Style::default().add_modifier(Modifier::BOLD)),
+        ])
+        .style(self.0.theme().header_style)
+        .height(1);
+
+        // Column widths
+        let widths = [
+            Constraint::Length(12),
+            Constraint::Fill(1),
+            Constraint::Length(10),
+            Constraint::Length(20),
+        ];
+
+        let mut table = Table::new(rows, widths)
+            .header(header)
+            .style(self.0.theme().style)
+            .highlight_style(highlight_style)
+            .highlight_spacing(self.0.theme().highlight_spacing.clone());
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
-            list = list.highlight_symbol(symbol);
+            table = table.highlight_symbol(symbol);
         }
 
         if let Some(block) = self.0.theme().block.as_ref() {
@@ -70,10 +95,10 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
                 block = block.title_bottom(title_bottom);
             }
 
-            list = list.block(block);
+            table = table.block(block);
         }
 
-        list.render(area, buf, &mut state);
+        StatefulWidget::render(table, area, buf, &mut state);
 
         // Update scroll offset after rendering
         self.0.set_scroll_offset(state.offset());
@@ -89,39 +114,62 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
         let files = self.0.files();
         let selected_idx = self.0.selected_idx();
 
-        let mut state = ListState::default()
+        let mut state = TableState::default()
             .with_selected(Some(selected_idx))
             .with_offset(self.0.scroll_offset());
 
         // Check if current item is selected
-        let current_is_selected = self.0.is_file_selected(self.0.current());
+        let current = self.0.current();
+        let current_is_selected = self.0.is_file_selected(current);
 
-        let highlight_style = if current_is_selected {
-            // If current item is selected, always use cyan foreground
-            if self.0.current().is_dir() {
-                self.0.theme().highlight_dir_style.fg(Color::Cyan)
-            } else {
-                self.0.theme().highlight_item_style.fg(Color::Cyan)
-            }
+        // Choose highlight style based on whether current item is a directory
+        let base_highlight_style = if current.is_dir() {
+            self.0.theme().highlight_dir_style
         } else {
-            if self.0.current().is_dir() {
-                self.0.theme().highlight_dir_style
-            } else {
-                self.0.theme().highlight_item_style
-            }
+            self.0.theme().highlight_item_style
         };
 
-        let mut list = List::new(files.iter().map(|file| {
-            let is_selected = self.0.is_file_selected(file);
-            file.text(self.0.theme(), is_selected)
-        }))
-        .style(self.0.theme().style)
-        .highlight_spacing(self.0.theme().highlight_spacing.clone())
-        .highlight_style(highlight_style)
-        .scroll_padding(self.0.theme().scroll_padding);
+        let highlight_style = if current_is_selected {
+            base_highlight_style.fg(Color::Cyan)
+        } else {
+            base_highlight_style
+        };
+
+        // Create table rows
+        let rows: Vec<Row> = files
+            .iter()
+            .map(|file| {
+                let is_selected = self.0.is_file_selected(file);
+                file.to_row(self.0.theme(), is_selected)
+            })
+            .collect();
+
+        // Create header
+        let header = Row::new(vec![
+            Cell::from("Permissions").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from("Path").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from("Size").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from("Modified At").style(Style::default().add_modifier(Modifier::BOLD)),
+        ])
+        .style(self.0.theme().header_style)
+        .height(1);
+
+        // Column widths
+        let widths = [
+            Constraint::Length(12),
+            Constraint::Fill(1),
+            Constraint::Length(10),
+            Constraint::Length(20),
+        ];
+
+        let mut table = Table::new(rows, widths)
+            .header(header)
+            .style(self.0.theme().style)
+            .highlight_style(highlight_style)
+            .highlight_spacing(self.0.theme().highlight_spacing.clone());
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
-            list = list.highlight_symbol(symbol);
+            table = table.highlight_symbol(symbol);
         }
 
         if let Some(block) = self.0.theme().block.as_ref() {
@@ -134,33 +182,133 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
                 block = block.title_bottom(title_bottom);
             }
 
-            list = list.block(block);
+            table = table.block(block);
         }
 
-        ratatui::widgets::StatefulWidgetRef::render_ref(&list, area, buf, &mut state);
+        StatefulWidget::render(table, area, buf, &mut state);
     }
 }
 
 impl File {
-    /// Returns the text with the appropriate style to be displayed for the file.
-    fn text<F: FileSystem>(&self, theme: &Theme<F>, is_selected: bool) -> Text<'_> {
+    /// Returns a table row with the appropriate style to be displayed for the file.
+    fn to_row<F: FileSystem>(&self, theme: &Theme<F>, is_selected: bool) -> Row<'_> {
         let style = if self.is_dir() {
             *theme.dir_style()
         } else {
             *theme.item_style()
         };
 
-        if is_selected {
-            let selected_style = style.patch(Style::default().fg(Color::Cyan));
-            Span::styled(
-                format!("{}{}", theme.selected_marker(), self.name()),
-                selected_style,
-            )
-            .into()
+        let final_style = if is_selected {
+            style.patch(Style::default().fg(Color::Cyan))
         } else {
-            Span::styled(self.name().to_string(), style).into()
-        }
+            style
+        };
+
+        // Format permissions
+        let permissions_str = self
+            .permissions()
+            .map(|p| p.to_string(self.is_dir()))
+            .unwrap_or_else(|| "---------".to_string());
+
+        // File type indicator
+        let file_type_indicator = if theme.use_icons {
+            if self.is_dir() {
+                ""
+            } else if self.permissions().is_some_and(|p| p.is_symlink) {
+                ""
+            } else {
+                ""
+            }
+        } else {
+            ""
+        };
+
+        // Format name with type indicator and selected marker
+        let name = if is_selected {
+            format!(
+                "{} {} {}",
+                file_type_indicator,
+                theme.selected_marker(),
+                self.name()
+            )
+        } else {
+            format!("{} {}", file_type_indicator, self.name())
+        };
+
+        // Format size
+        let size_str = self.size().map(format_size).unwrap_or_default();
+
+        // Format modified time
+        let modified_str = self.modified().map(format_time).unwrap_or_default();
+
+        Row::new(vec![
+            Cell::from(permissions_str).style(final_style),
+            Cell::from(name).style(final_style),
+            Cell::from(size_str).style(final_style),
+            Cell::from(modified_str).style(final_style),
+        ])
     }
+}
+
+/// Format file size in human-readable format
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+    const TB: u64 = GB * 1024;
+
+    if bytes >= TB {
+        format!("{:.2} TB", bytes as f64 / TB as f64)
+    } else if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Format time in YYYY-MM-DD HH:MM:SS format
+fn format_time(time: std::time::SystemTime) -> String {
+    use std::time::UNIX_EPOCH;
+
+    let duration = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let secs = duration.as_secs();
+
+    // Simple date/time calculation (no external crate dependency)
+    let days_since_epoch = secs / 86400;
+    let time_of_day = secs % 86400;
+
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Calculate year, month, day from days since epoch
+    let (year, month, day) = days_to_ymd(days_since_epoch as i64);
+
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        year, month, day, hours, minutes, seconds
+    )
+}
+
+/// Convert days since Unix epoch to year, month, day
+fn days_to_ymd(days: i64) -> (i32, u32, u32) {
+    // Algorithm from Howard Hinnant
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = (yoe as i64 + era * 400) as i32;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    (y, m, d)
 }
 
 /// The theme of the file explorer.
@@ -187,6 +335,8 @@ pub struct Theme<F: FileSystem = crate::filesystem::LocalFileSystem> {
     highlight_symbol: Option<String>,
     scroll_padding: usize,
     selected_marker: String,
+    header_style: Style,
+    use_icons: bool,
 }
 
 impl<F: FileSystem> Theme<F> {
@@ -213,7 +363,9 @@ impl<F: FileSystem> Theme<F> {
             highlight_dir_style: Style::new(),
             highlight_symbol: None,
             scroll_padding: 0,
-            selected_marker: "[✓] ".to_string(),
+            selected_marker: "[✓]".to_string(),
+            header_style: Style::new(),
+            use_icons: false,
         }
     }
 
@@ -265,7 +417,7 @@ impl<F: FileSystem> Theme<F> {
 
     /// Wrap the file explorer with a custom [`Block`](https://docs.rs/ratatui/latest/ratatui/widgets/block/struct.Block.html) widget.
     ///
-    /// Behind the scene, it use the [`List::block`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.block) method. See its documentation for more.
+    /// Behind the scene, it use the [`Table::block`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.Table.html#method.block) method. See its documentation for more.
     ///
     /// You can use [`Theme::with_title_top`](#method.title_top) and [`Theme::with_title_bottom`](#method.title_bottom)
     /// to add customizable titles to the block.
@@ -285,7 +437,7 @@ impl<F: FileSystem> Theme<F> {
 
     /// Set the style of the widget.
     ///
-    /// Behind the scene, it use the [`List::style`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.style) method. See its documentation for more.
+    /// Behind the scene, it use the [`Table::style`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.Table.html#method.style) method. See its documentation for more.
     ///
     /// # Example
     /// ```no_run
@@ -336,7 +488,7 @@ impl<F: FileSystem> Theme<F> {
 
     /// Set the style of all highlighted non directories items. To set the style of the highlighted directories, use [`Theme::with_highlight_dir_style`](#method.highlight_dir_style).
     ///
-    /// Behind the scene, it use the [`List::highlight_style`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.highlight_style) method. See its documentation for more.
+    /// Behind the scene, it use the [`Table::row_highlight_style`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.Table.html#method.row_highlight_style) method. See its documentation for more.
     ///
     /// # Example
     /// ```no_run
@@ -353,7 +505,7 @@ impl<F: FileSystem> Theme<F> {
 
     /// Set the style of all highlighted directories items. To set the style of the highlighted non directories, use [`Theme::with_highlight_item_style`](#method.highlight_item_style).
     ///
-    /// Behind the scene, it use the [`List::highlight_style`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.highlight_style) method. See its documentation for more.
+    /// Behind the scene, it use the [`Table::row_highlight_style`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.Table.html#method.row_highlight_style) method. See its documentation for more.
     ///
     /// # Example
     /// ```no_run
@@ -370,7 +522,7 @@ impl<F: FileSystem> Theme<F> {
 
     /// Set the symbol used to highlight the selected item.
     ///
-    /// Behind the scene, it use the [List::highlight_symbol](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.highlight_symbol) method. See its documentation for more.
+    /// Behind the scene, it use the [Table::highlight_symbol](https://docs.rs/ratatui/latest/ratatui/widgets/struct.Table.html#method.highlight_symbol) method. See its documentation for more.
     ///
     /// # Example
     /// ```no_run
@@ -386,7 +538,7 @@ impl<F: FileSystem> Theme<F> {
 
     /// Set the spacing between the highlighted item and the other items.
     ///
-    /// Behind the scene, it use the [`List::highlight_spacing`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.highlight_spacing) method. See its documentation for more.
+    /// Behind the scene, it use the [`Table::highlight_spacing`](https://docs.rs/ratatui/latest/ratatui/widgets/struct.Table.html#method.highlight_spacing) method. See its documentation for more.
     ///
     /// # Example
     /// ```no_run
@@ -403,8 +555,6 @@ impl<F: FileSystem> Theme<F> {
 
     /// Sets the number of items around the currently selected item that should be kept visible.
     ///
-    /// /// Behind the scene, it use the [List::scroll_padding](https://docs.rs/ratatui/latest/ratatui/widgets/struct.List.html#method.scroll_padding) method. See its documentation for more.
-    ///
     /// # Example
     /// ```no_run
     /// # use ratatui::widgets::*;
@@ -420,17 +570,46 @@ impl<F: FileSystem> Theme<F> {
 
     /// Sets the marker string to display before selected files.
     ///
-    /// By default, the marker is "[✓] ".
+    /// By default, the marker is "[✓]".
     ///
     /// # Example
     /// ```no_run
     /// # use ratatui_explorer::Theme;
-    /// let theme: Theme = Theme::default().with_selected_marker("[x] ");
+    /// let theme: Theme = Theme::default().with_selected_marker("[x]");
     /// ```
     #[inline]
     #[must_use = "method moves the value of self and returns the modified value"]
     pub fn with_selected_marker(mut self, marker: impl Into<String>) -> Self {
         self.selected_marker = marker.into();
+        self
+    }
+
+    /// Sets whether to use icons for the file explorer.
+    ///
+    /// By default, the icons are not used.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use ratatui_explorer::Theme;
+    /// let theme: Theme = Theme::default().use_icons(true);
+    /// ```
+    pub fn use_icons(mut self, use_icons: bool) -> Self {
+        self.use_icons = use_icons;
+        self
+    }
+
+    /// Sets the style for the table header row.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use ratatui::prelude::*;
+    /// # use ratatui_explorer::Theme;
+    /// let theme: Theme = Theme::default().with_header_style(Style::default().fg(Color::Yellow));
+    /// ```
+    #[inline]
+    #[must_use = "method moves the value of self and returns the modified value"]
+    pub fn with_header_style<S: Into<Style>>(mut self, header_style: S) -> Self {
+        self.header_style = header_style.into();
         self
     }
 
@@ -566,6 +745,13 @@ impl<F: FileSystem> Theme<F> {
         &self.selected_marker
     }
 
+    /// Returns the style for the table header row.
+    #[inline]
+    #[must_use]
+    pub const fn header_style(&self) -> &Style {
+        &self.header_style
+    }
+
     /// Returns the generated top titles of the theme.
     #[inline]
     #[must_use]
@@ -591,7 +777,7 @@ impl<F: FileSystem> Default for Theme<F> {
     /// Return a slightly customized default theme. To get a theme with no style set, use [`Theme::new`](#method.new).
     ///
     /// The theme will have a block with all borders, a white style for the items, a light blue style for the directories,
-    /// a dark gray background for all the highlighted items.
+    /// and a magenta background for highlighted rows.
     ///
     /// # Example
     /// ```no_run
@@ -607,11 +793,15 @@ impl<F: FileSystem> Default for Theme<F> {
             item_style: Style::default().fg(Color::White),
             dir_style: Style::default().fg(Color::LightBlue),
             highlight_spacing: HighlightSpacing::Always,
-            highlight_item_style: Style::default().fg(Color::White).bg(Color::Cyan),
-            highlight_dir_style: Style::default().fg(Color::LightBlue).bg(Color::Cyan),
+            highlight_item_style: Style::default().bg(Color::Magenta).fg(Color::White),
+            highlight_dir_style: Style::default().bg(Color::Magenta).fg(Color::LightBlue),
             highlight_symbol: None,
             scroll_padding: 0,
-            selected_marker: "[✓] ".to_string(),
+            selected_marker: "[✓]".to_string(),
+            header_style: Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+            use_icons: false,
         }
     }
 }

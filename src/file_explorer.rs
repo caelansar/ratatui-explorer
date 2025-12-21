@@ -924,6 +924,9 @@ impl<F: FileSystem> FileExplorer<F> {
                 is_dir: entry.is_dir,
                 is_hidden: entry.is_hidden,
                 file_type: None, // FileEntry doesn't include FileType
+                size: entry.size,
+                modified: entry.modified,
+                permissions: entry.permissions,
             })
             .collect();
 
@@ -937,6 +940,9 @@ impl<F: FileSystem> FileExplorer<F> {
                     is_dir: true,
                     is_hidden: false,
                     file_type: None,
+                    size: None,
+                    modified: None,
+                    permissions: None,
                 },
             );
         }
@@ -1007,6 +1013,9 @@ pub struct File {
     is_dir: bool,
     is_hidden: bool,
     file_type: Option<FileType>,
+    size: Option<u64>,
+    modified: Option<std::time::SystemTime>,
+    permissions: Option<crate::filesystem::FilePermissions>,
 }
 
 impl File {
@@ -1212,5 +1221,28 @@ impl File {
     #[must_use]
     pub const fn file_type(&self) -> Option<FileType> {
         self.file_type
+    }
+
+    /// Returns the size of the file in bytes.
+    ///
+    /// Returns `None` for directories.
+    #[inline]
+    #[must_use]
+    pub const fn size(&self) -> Option<u64> {
+        self.size
+    }
+
+    /// Returns the last modified time of the file.
+    #[inline]
+    #[must_use]
+    pub const fn modified(&self) -> Option<std::time::SystemTime> {
+        self.modified
+    }
+
+    /// Returns the file permissions.
+    #[inline]
+    #[must_use]
+    pub const fn permissions(&self) -> Option<crate::filesystem::FilePermissions> {
+        self.permissions
     }
 }

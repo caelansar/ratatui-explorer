@@ -10,6 +10,66 @@ mod local;
 
 pub use local::LocalFileSystem;
 
+/// Unix-style file permissions representation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct FilePermissions {
+    /// User read permission
+    pub user_read: bool,
+    /// User write permission
+    pub user_write: bool,
+    /// User execute permission
+    pub user_execute: bool,
+    /// Group read permission
+    pub group_read: bool,
+    /// Group write permission
+    pub group_write: bool,
+    /// Group execute permission
+    pub group_execute: bool,
+    /// Others read permission
+    pub others_read: bool,
+    /// Others write permission
+    pub others_write: bool,
+    /// Others execute permission
+    pub others_execute: bool,
+    /// Whether this is a symbolic link
+    pub is_symlink: bool,
+}
+
+impl FilePermissions {
+    /// Create permissions from a Unix mode value (e.g., 0o755)
+    #[cfg(unix)]
+    pub fn from_mode(mode: u32, is_symlink: bool) -> Self {
+        Self {
+            user_read: mode & 0o400 != 0,
+            user_write: mode & 0o200 != 0,
+            user_execute: mode & 0o100 != 0,
+            group_read: mode & 0o040 != 0,
+            group_write: mode & 0o020 != 0,
+            group_execute: mode & 0o010 != 0,
+            others_read: mode & 0o004 != 0,
+            others_write: mode & 0o002 != 0,
+            others_execute: mode & 0o001 != 0,
+            is_symlink,
+        }
+    }
+
+    /// Format permissions as a Unix-style string (e.g., "rwxr-xr-x")
+    pub fn to_string(&self, _is_dir: bool) -> String {
+        format!(
+            "{}{}{}{}{}{}{}{}{}",
+            if self.user_read { "r" } else { "-" },
+            if self.user_write { "w" } else { "-" },
+            if self.user_execute { "x" } else { "-" },
+            if self.group_read { "r" } else { "-" },
+            if self.group_write { "w" } else { "-" },
+            if self.group_execute { "x" } else { "-" },
+            if self.others_read { "r" } else { "-" },
+            if self.others_write { "w" } else { "-" },
+            if self.others_execute { "x" } else { "-" },
+        )
+    }
+}
+
 /// Represents a file or directory entry in the filesystem.
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -25,6 +85,8 @@ pub struct FileEntry {
     pub size: Option<u64>,
     /// The last modified time of the file
     pub modified: Option<std::time::SystemTime>,
+    /// File permissions
+    pub permissions: Option<FilePermissions>,
 }
 
 /// A trait for abstracting filesystem operations.

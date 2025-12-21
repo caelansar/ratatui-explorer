@@ -1,6 +1,6 @@
 //! Local filesystem implementation.
 
-use super::{FileEntry, FileSystem};
+use super::{FileEntry, FilePermissions, FileSystem};
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::time::Duration;
@@ -23,14 +23,27 @@ impl FileSystem for LocalFileSystem {
 
             while let Some(entry) = read_dir.next_entry().await? {
                 let name = entry.file_name().to_string_lossy().to_string();
-                let path = entry.path().to_string_lossy().to_string();
+                let entry_path = entry.path().to_string_lossy().to_string();
+
+                // First get symlink metadata to check if it's a symlink
+                let symlink_metadata_result = tokio::time::timeout(
+                    Duration::from_secs(2),
+                    tokio::fs::symlink_metadata(&entry_path),
+                )
+                .await;
+
+                let is_symlink = match &symlink_metadata_result {
+                    Ok(Ok(meta)) => meta.file_type().is_symlink(),
+                    _ => false,
+                };
 
                 // Use a timeout for each entry's metadata read
                 // This helps with slow network mounts or inaccessible files
                 // Use tokio::fs::metadata() instead of entry.metadata() to follow symlinks
                 // This ensures symlinks to directories (like /bin -> /usr/bin) are recognized as directories
                 let metadata_result =
-                    tokio::time::timeout(Duration::from_secs(2), tokio::fs::metadata(&path)).await;
+                    tokio::time::timeout(Duration::from_secs(2), tokio::fs::metadata(&entry_path))
+                        .await;
 
                 let metadata = match metadata_result {
                     Ok(Ok(meta)) => meta,
@@ -62,13 +75,29 @@ impl FileSystem for LocalFileSystem {
                     }
                 };
 
+                // Get permissions
+                let permissions = {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let mode = metadata.permissions().mode();
+                        Some(FilePermissions::from_mode(mode, is_symlink))
+                    }
+
+                    #[cfg(not(unix))]
+                    {
+                        None
+                    }
+                };
+
                 temp_entries.push(FileEntry {
                     name: if is_dir { format!("{}/", name) } else { name },
-                    path,
+                    path: entry_path,
                     is_dir,
                     is_hidden,
                     size: if is_dir { None } else { Some(metadata.len()) },
                     modified: metadata.modified().ok(),
+                    permissions,
                 });
             }
 
