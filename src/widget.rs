@@ -224,15 +224,16 @@ impl File {
         };
 
         // Format name with type indicator and selected marker
-        let name = if is_selected {
-            format!(
+        let name = match (is_selected, file_type_indicator.is_empty()) {
+            (true, true) => format!("{} {}", theme.selected_marker(), self.name()),
+            (true, false) => format!(
                 "{} {} {}",
                 file_type_indicator,
                 theme.selected_marker(),
                 self.name()
-            )
-        } else {
-            format!("{} {}", file_type_indicator, self.name())
+            ),
+            (false, true) => self.name().to_string(),
+            (false, false) => format!("{} {}", file_type_indicator, self.name()),
         };
 
         // Format size
