@@ -31,14 +31,12 @@ pub struct FilePermissions {
     pub others_write: bool,
     /// Others execute permission
     pub others_execute: bool,
-    /// Whether this is a symbolic link
-    pub is_symlink: bool,
 }
 
 impl FilePermissions {
     /// Create permissions from a Unix mode value (e.g., 0o755)
     #[cfg(unix)]
-    pub fn from_mode(mode: u32, is_symlink: bool) -> Self {
+    pub fn from_mode(mode: u32) -> Self {
         Self {
             user_read: mode & 0o400 != 0,
             user_write: mode & 0o200 != 0,
@@ -49,7 +47,6 @@ impl FilePermissions {
             others_read: mode & 0o004 != 0,
             others_write: mode & 0o002 != 0,
             others_execute: mode & 0o001 != 0,
-            is_symlink,
         }
     }
 
@@ -87,6 +84,10 @@ pub struct FileEntry {
     pub modified: Option<std::time::SystemTime>,
     /// File permissions
     pub permissions: Option<FilePermissions>,
+    /// Whether this is a symbolic link
+    pub is_symlink: bool,
+    /// The target path if this is a symbolic link
+    pub symlink_target: Option<String>,
 }
 
 /// A trait for abstracting filesystem operations.

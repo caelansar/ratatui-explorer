@@ -25,31 +25,74 @@ impl FileSystem for LocalFileSystem {
                 let name = entry.file_name().to_string_lossy().to_string();
                 let entry_path = entry.path().to_string_lossy().to_string();
 
-                // First get symlink metadata to check if it's a symlink
-                let symlink_metadata_result = tokio::time::timeout(
-                    Duration::from_secs(2),
-                    tokio::fs::symlink_metadata(&entry_path),
-                )
-                .await;
+                // Use DirEntry.file_type() to check for symlinks
+                // On Linux, this may be free (already from readdir syscall)
+                // On other platforms, it's still more efficient than full metadata
+                let file_type_result =
+                    tokio::time::timeout(Duration::from_secs(2), entry.file_type()).await;
 
-                let is_symlink = match &symlink_metadata_result {
-                    Ok(Ok(meta)) => meta.file_type().is_symlink(),
-                    _ => false,
+                let file_type = match file_type_result {
+                    Ok(Ok(ft)) => ft,
+                    Ok(Err(_)) | Err(_) => {
+                        // Skip entries we can't read file type for
+                        println!("Can't read file type for: {}", entry_path);
+                        continue;
+                    }
                 };
 
-                // Use a timeout for each entry's metadata read
-                // This helps with slow network mounts or inaccessible files
-                // Use tokio::fs::metadata() instead of entry.metadata() to follow symlinks
-                // This ensures symlinks to directories (like /bin -> /usr/bin) are recognized as directories
-                let metadata_result =
-                    tokio::time::timeout(Duration::from_secs(2), tokio::fs::metadata(&entry_path))
-                        .await;
+                let is_symlink = file_type.is_symlink();
 
-                let metadata = match metadata_result {
-                    Ok(Ok(meta)) => meta,
-                    Ok(Err(_)) | Err(_) => {
-                        // Skip entries we can't read metadata for
-                        continue;
+                // Read symlink target if this is a symlink
+                let symlink_target = if is_symlink {
+                    let target_result = tokio::time::timeout(
+                        Duration::from_secs(2),
+                        tokio::fs::read_link(&entry_path),
+                    )
+                    .await;
+
+                    match target_result {
+                        Ok(Ok(target_path)) => Some(target_path.to_string_lossy().to_string()),
+                        Ok(Err(_)) | Err(_) => None,
+                    }
+                } else {
+                    None
+                };
+
+                // For symlinks, we MUST use tokio::fs::metadata() to follow the link
+                // For non-symlinks, use entry.metadata() which may be more efficient
+                let metadata = if is_symlink {
+                    // Follow symlink to get target metadata
+                    // This is critical for symlink-to-directory navigation (e.g., /bin -> /usr/bin)
+                    let meta_result = tokio::time::timeout(
+                        Duration::from_secs(2),
+                        tokio::fs::metadata(&entry_path),
+                    )
+                    .await;
+
+                    match meta_result {
+                        Ok(Ok(meta)) => meta,
+                        Ok(Err(e)) => {
+                            // Skip broken or inaccessible symlinks
+                            println!("Broken or inaccessible symlink: {}: {}", entry_path, e);
+                            continue;
+                        }
+                        Err(_) => {
+                            println!("Error getting metadata for symlink: {}", entry_path);
+                            continue;
+                        }
+                    }
+                } else {
+                    // For non-symlinks, use DirEntry.metadata() which may reuse cached data
+                    // This is more efficient as it might avoid an additional syscall
+                    let meta_result =
+                        tokio::time::timeout(Duration::from_secs(2), entry.metadata()).await;
+
+                    match meta_result {
+                        Ok(Ok(meta)) => meta,
+                        Ok(Err(_)) | Err(_) => {
+                            // Skip entries we can't read metadata for
+                            continue;
+                        }
                     }
                 };
 
@@ -81,7 +124,7 @@ impl FileSystem for LocalFileSystem {
                     {
                         use std::os::unix::fs::PermissionsExt;
                         let mode = metadata.permissions().mode();
-                        Some(FilePermissions::from_mode(mode, is_symlink))
+                        Some(FilePermissions::from_mode(mode))
                     }
 
                     #[cfg(not(unix))]
@@ -98,6 +141,8 @@ impl FileSystem for LocalFileSystem {
                     size: if is_dir { None } else { Some(metadata.len()) },
                     modified: metadata.modified().ok(),
                     permissions,
+                    is_symlink,
+                    symlink_target,
                 });
             }
 

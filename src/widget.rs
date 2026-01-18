@@ -207,15 +207,13 @@ impl File {
         // Format permissions
         let permissions_str = self
             .permissions()
-            .map(|p| p.to_string(self.is_dir()))
+            .map(|p: crate::FilePermissions| p.to_string(self.is_dir()))
             .unwrap_or_else(|| "---------".to_string());
 
         // File type indicator
         let file_type_indicator = if theme.use_icons {
             if self.is_dir() {
                 ""
-            } else if self.permissions().is_some_and(|p| p.is_symlink) {
-                ""
             } else {
                 ""
             }
@@ -224,16 +222,22 @@ impl File {
         };
 
         // Format name with type indicator and selected marker
+        let base_name = if let Some(target) = &self.symlink_target() {
+            format!("{} -> {}", self.name(), target)
+        } else {
+            self.name().to_string()
+        };
+
         let name = match (is_selected, file_type_indicator.is_empty()) {
-            (true, true) => format!("{} {}", theme.selected_marker(), self.name()),
+            (true, true) => format!("{} {}", theme.selected_marker(), base_name),
             (true, false) => format!(
                 "{} {} {}",
                 file_type_indicator,
                 theme.selected_marker(),
-                self.name()
+                base_name
             ),
-            (false, true) => self.name().to_string(),
-            (false, false) => format!("{} {}", file_type_indicator, self.name()),
+            (false, true) => base_name,
+            (false, false) => format!("{} {}", file_type_indicator, base_name),
         };
 
         // Format size

@@ -927,6 +927,7 @@ impl<F: FileSystem> FileExplorer<F> {
                 size: entry.size,
                 modified: entry.modified,
                 permissions: entry.permissions,
+                symlink_target: entry.symlink_target,
             })
             .collect();
 
@@ -943,6 +944,7 @@ impl<F: FileSystem> FileExplorer<F> {
                     size: None,
                     modified: None,
                     permissions: None,
+                    symlink_target: None,
                 },
             );
         }
@@ -1016,6 +1018,7 @@ pub struct File {
     size: Option<u64>,
     modified: Option<std::time::SystemTime>,
     permissions: Option<crate::filesystem::FilePermissions>,
+    symlink_target: Option<String>,
 }
 
 impl File {
@@ -1112,6 +1115,13 @@ impl File {
     #[must_use]
     pub const fn is_dir(&self) -> bool {
         self.is_dir
+    }
+
+    /// Returns the target of the symbolic link if the file is a symbolic link.
+    #[inline]
+    #[must_use]
+    pub fn symlink_target(&self) -> Option<&str> {
+        self.symlink_target.as_deref()
     }
 
     /// Returns `true` is the file is a regular file.
