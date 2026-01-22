@@ -78,7 +78,7 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
         let mut table = Table::new(rows, widths)
             .header(header)
             .style(self.0.theme().style)
-            .highlight_style(highlight_style)
+            .row_highlight_style(highlight_style)
             .highlight_spacing(self.0.theme().highlight_spacing.clone());
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
@@ -165,7 +165,7 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
         let mut table = Table::new(rows, widths)
             .header(header)
             .style(self.0.theme().style)
-            .highlight_style(highlight_style)
+            .row_highlight_style(highlight_style)
             .highlight_spacing(self.0.theme().highlight_spacing.clone());
 
         if let Some(symbol) = self.0.theme().highlight_symbol.as_deref() {
@@ -760,7 +760,7 @@ impl<F: FileSystem> Theme<F> {
     /// Returns the generated top titles of the theme.
     #[inline]
     #[must_use]
-    pub fn title_top(&self, file_explorer: &FileExplorer<F>) -> Vec<Line> {
+    pub fn title_top(&self, file_explorer: &FileExplorer<F>) -> Vec<Line<'_>> {
         self.title_top
             .iter()
             .map(|title_top| title_top(file_explorer))
@@ -770,7 +770,7 @@ impl<F: FileSystem> Theme<F> {
     /// Returns the generated bottom titles of the theme.
     #[inline]
     #[must_use]
-    pub fn title_bottom(&self, file_explorer: &FileExplorer<F>) -> Vec<Line> {
+    pub fn title_bottom(&self, file_explorer: &FileExplorer<F>) -> Vec<Line<'_>> {
         self.title_bottom
             .iter()
             .map(|title_bottom| title_bottom(file_explorer))
