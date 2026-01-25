@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs::FileType, io::Result, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, io::Result, path::PathBuf, sync::Arc};
 
 use ratatui::widgets::WidgetRef;
 
@@ -922,8 +922,8 @@ impl<F: FileSystem> FileExplorer<F> {
                 name: entry.name,
                 path: PathBuf::from(entry.path),
                 is_dir: entry.is_dir,
+                is_file: entry.is_file,
                 is_hidden: entry.is_hidden,
-                file_type: None, // FileEntry doesn't include FileType
                 size: entry.size,
                 modified: entry.modified,
                 permissions: entry.permissions,
@@ -939,8 +939,8 @@ impl<F: FileSystem> FileExplorer<F> {
                     name: "../".to_owned(),
                     path: parent.to_path_buf(),
                     is_dir: true,
+                    is_file: false,
                     is_hidden: false,
-                    file_type: None,
                     size: None,
                     modified: None,
                     permissions: None,
@@ -1012,9 +1012,9 @@ impl FileExplorer<LocalFileSystem> {
 pub struct File {
     name: String,
     path: PathBuf,
+    is_file: bool,
     is_dir: bool,
     is_hidden: bool,
-    file_type: Option<FileType>,
     size: Option<u64>,
     modified: Option<std::time::SystemTime>,
     permissions: Option<crate::filesystem::FilePermissions>,
@@ -1135,7 +1135,7 @@ impl File {
     ///     ├── passport.png  <- selected
     ///     └── resume.pdf
     /// ```
-    /// You can know if the selected file is a directory like this:
+    /// You can know if the selected file is a regular file like this:
     /// ```no_run
     /// use ratatui_explorer::FileExplorer;
     ///
@@ -1156,7 +1156,7 @@ impl File {
     #[inline]
     #[must_use]
     pub fn is_file(&self) -> bool {
-        self.file_type.is_some_and(|f| f.is_file())
+        self.is_file
     }
 
     /// Returns `true` if the file or directory is hidden.
@@ -1192,45 +1192,6 @@ impl File {
     #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.is_hidden
-    }
-
-    /// Returns the `FileType` of the file, when available.
-    ///
-    /// # Examples
-    /// Suppose you have this tree file, with `passport.png` selected inside `file_explorer`:
-    /// ```plaintext
-    /// /
-    /// ├── .git
-    /// └── Documents
-    ///     ├── passport.png  <- selected
-    ///     └── resume.pdf
-    /// ```
-    /// You can know if the selected file is a directory like this:
-    /// ```no_run
-    /// use std::os::unix::fs::FileTypeExt;
-    ///
-    /// use ratatui_explorer::FileExplorer;
-    ///
-    /// # tokio_test::block_on(async {
-    /// let file_explorer = FileExplorer::new().await.unwrap();
-    ///
-    /// /* user select `password.png` */
-    ///
-    /// let file = file_explorer.current();
-    /// assert_eq!(file.file_type().unwrap().is_file(), true);
-    /// assert_eq!(file.file_type().unwrap().is_socket(), false);
-    ///
-    /// /* user select `Documents` */
-    ///
-    /// let file = file_explorer.current();
-    /// assert_eq!(file.file_type().unwrap().is_file(), false);
-    /// assert_eq!(file.file_type().unwrap().is_socket(), false);
-    /// # })
-    /// ```
-    #[inline]
-    #[must_use]
-    pub const fn file_type(&self) -> Option<FileType> {
-        self.file_type
     }
 
     /// Returns the size of the file in bytes.

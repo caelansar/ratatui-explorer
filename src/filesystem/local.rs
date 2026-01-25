@@ -97,6 +97,7 @@ impl FileSystem for LocalFileSystem {
                 };
 
                 let is_dir = metadata.is_dir();
+                let is_file = metadata.is_file();
 
                 // Determine if file is hidden
                 let is_hidden = {
@@ -136,6 +137,7 @@ impl FileSystem for LocalFileSystem {
                 temp_entries.push(FileEntry {
                     name: if is_dir { format!("{}/", name) } else { name },
                     path: entry_path,
+                    is_file,
                     is_dir,
                     is_hidden,
                     size: if is_dir { None } else { Some(metadata.len()) },

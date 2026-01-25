@@ -76,6 +76,8 @@ pub struct FileEntry {
     pub path: String,
     /// Whether this entry is a directory
     pub is_dir: bool,
+    /// Whether this entry is a file
+    pub is_file: bool,
     /// Whether this entry is hidden
     pub is_hidden: bool,
     /// The size of the file in bytes (None for directories)
