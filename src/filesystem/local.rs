@@ -35,7 +35,7 @@ impl FileSystem for LocalFileSystem {
                     Ok(Ok(ft)) => ft,
                     Ok(Err(_)) | Err(_) => {
                         // Skip entries we can't read file type for
-                        println!("Can't read file type for: {}", entry_path);
+                        tracing::error!("Can't read file type for: {}", entry_path);
                         continue;
                     }
                 };
@@ -73,11 +73,15 @@ impl FileSystem for LocalFileSystem {
                         Ok(Ok(meta)) => meta,
                         Ok(Err(e)) => {
                             // Skip broken or inaccessible symlinks
-                            println!("Broken or inaccessible symlink: {}: {}", entry_path, e);
+                            tracing::error!(
+                                "Broken or inaccessible symlink: {}: {}",
+                                entry_path,
+                                e
+                            );
                             continue;
                         }
                         Err(_) => {
-                            println!("Error getting metadata for symlink: {}", entry_path);
+                            tracing::error!("Error getting metadata for symlink: {}", entry_path);
                             continue;
                         }
                     }
