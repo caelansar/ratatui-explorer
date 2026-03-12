@@ -9,6 +9,13 @@ use crate::{
     Theme,
 };
 
+/// A closure-based file filter that can both filter and transform files.
+///
+/// The closure receives a reference to a [`File`] and returns `Some(File)` to include it
+/// (possibly transformed), or `None` to exclude it. This uses `Arc` because `FileExplorer`
+/// derives `Clone`.
+pub type FileFilter = Arc<dyn Fn(&File) -> Option<File> + Send + Sync>;
+
 /// A file explorer that allows browsing and selecting files and directories.
 ///
 /// The `FileExplorer` struct represents a file explorer widget that can be used to navigate
@@ -59,18 +66,35 @@ use crate::{
 /// println!("Name: {}", current_file.name());
 /// # })
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FileExplorer<F: FileSystem = LocalFileSystem> {
     filesystem: Arc<F>,
     cwd: PathBuf,
     files: Vec<File>,
-    filtered_files: Vec<(usize, File)>,
+    filtered_files: Vec<File>,
     show_hidden: bool,
     selected: usize,
     theme: Theme<F>,
     search_filter: Option<String>,
+    filter: Option<FileFilter>,
     scroll_offset: usize,
     selected_paths: HashSet<PathBuf>,
+}
+
+impl<F: FileSystem> std::fmt::Debug for FileExplorer<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileExplorer")
+            .field("cwd", &self.cwd)
+            .field("files", &self.files)
+            .field("filtered_files", &self.filtered_files)
+            .field("show_hidden", &self.show_hidden)
+            .field("selected", &self.selected)
+            .field("search_filter", &self.search_filter)
+            .field("filter", &self.filter.as_ref().map(|_| "..."))
+            .field("scroll_offset", &self.scroll_offset)
+            .field("selected_paths", &self.selected_paths)
+            .finish()
+    }
 }
 
 impl<F: FileSystem> FileExplorer<F> {
@@ -108,6 +132,7 @@ impl<F: FileSystem> FileExplorer<F> {
             selected: 0,
             theme: Theme::default(),
             search_filter: None,
+            filter: None,
             scroll_offset: 0,
             selected_paths: HashSet::new(),
         };
@@ -246,8 +271,8 @@ impl<F: FileSystem> FileExplorer<F> {
                     let new_filtered_idx = current_filtered_idx
                         .wrapping_sub(1)
                         .min(self.filtered_files.len() - 1);
-                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
-                        self.selected = *original_idx;
+                    if let Some(file) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = file.idx();
                     }
                 }
             }
@@ -255,27 +280,27 @@ impl<F: FileSystem> FileExplorer<F> {
                 if !self.filtered_files.is_empty() {
                     let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
                     let new_filtered_idx = (current_filtered_idx + 1) % self.filtered_files.len();
-                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
-                        self.selected = *original_idx;
+                    if let Some(file) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = file.idx();
                     }
                 }
             }
             Input::Home => {
-                if let Some((original_idx, _)) = self.filtered_files.first() {
-                    self.selected = *original_idx;
+                if let Some(file) = self.filtered_files.first() {
+                    self.selected = file.idx();
                 }
             }
             Input::End => {
-                if let Some((original_idx, _)) = self.filtered_files.last() {
-                    self.selected = *original_idx;
+                if let Some(file) = self.filtered_files.last() {
+                    self.selected = file.idx();
                 }
             }
             Input::PageUp => {
                 if !self.filtered_files.is_empty() {
                     let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
                     let new_filtered_idx = current_filtered_idx.saturating_sub(SCROLL_COUNT);
-                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
-                        self.selected = *original_idx;
+                    if let Some(file) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = file.idx();
                     }
                 }
             }
@@ -284,8 +309,8 @@ impl<F: FileSystem> FileExplorer<F> {
                     let current_filtered_idx = self.filtered_selected_idx().unwrap_or(0);
                     let new_filtered_idx =
                         (current_filtered_idx + SCROLL_COUNT).min(self.filtered_files.len() - 1);
-                    if let Some((original_idx, _)) = self.filtered_files.get(new_filtered_idx) {
-                        self.selected = *original_idx;
+                    if let Some(file) = self.filtered_files.get(new_filtered_idx) {
+                        self.selected = file.idx();
                     }
                 }
             }
@@ -446,7 +471,67 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     #[inline]
     pub fn set_search_filter(&mut self, filter: Option<String>) {
-        self.search_filter = filter;
+        match filter {
+            Some(ref query) => {
+                let q = query.to_lowercase();
+                self.filter = Some(Arc::new(move |file: &File| {
+                    if file.name().to_lowercase().contains(&q) {
+                        Some(file.clone())
+                    } else {
+                        None
+                    }
+                }));
+                self.search_filter = Some(query.clone());
+            }
+            None => {
+                self.filter = None;
+                self.search_filter = None;
+            }
+        }
+        self.filtered_files = self.compute_filtered_files();
+    }
+
+    /// Sets a custom closure-based filter with filter_map semantics.
+    ///
+    /// The closure receives a reference to a [`File`] and returns `Some(File)` to include it
+    /// (possibly transformed), or `None` to exclude it.
+    ///
+    /// Setting a filter clears any existing search filter set via [`set_search_filter`](#method.set_search_filter).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_explorer::FileExplorer;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut file_explorer = FileExplorer::new().await.unwrap();
+    ///
+    /// // Filter to show only directories
+    /// file_explorer.set_filter(Some(|file: &ratatui_explorer::File| {
+    ///     if file.is_dir() {
+    ///         Some(file.clone())
+    ///     } else {
+    ///         None
+    ///     }
+    /// }));
+    ///
+    /// // Clear the filter
+    /// file_explorer.clear_filter();
+    /// # })
+    /// ```
+    pub fn set_filter<P>(&mut self, filter: Option<P>)
+    where
+        P: Fn(&File) -> Option<File> + Send + Sync + 'static,
+    {
+        self.filter = filter.map(|f| Arc::new(f) as FileFilter);
+        self.search_filter = None;
+        self.filtered_files = self.compute_filtered_files();
+    }
+
+    /// Clears both the closure-based filter and the search filter, showing all files.
+    pub fn clear_filter(&mut self) {
+        self.filter = None;
+        self.search_filter = None;
         self.filtered_files = self.compute_filtered_files();
     }
 
@@ -488,7 +573,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     #[inline]
     #[must_use]
-    pub fn filtered_files(&self) -> &[(usize, File)] {
+    pub fn filtered_files(&self) -> &[File] {
         &self.filtered_files
     }
 
@@ -540,8 +625,8 @@ impl<F: FileSystem> FileExplorer<F> {
     pub fn set_selected_idx(&mut self, selected: usize) {
         assert!(selected < self.filtered_files.len());
 
-        if let Some((original_idx, _)) = self.filtered_files.get(selected) {
-            self.selected = *original_idx;
+        if let Some(file) = self.filtered_files.get(selected) {
+            self.selected = file.idx();
         }
     }
 
@@ -689,7 +774,7 @@ impl<F: FileSystem> FileExplorer<F> {
     #[inline]
     #[must_use]
     pub fn files(&self) -> Vec<&File> {
-        self.filtered_files.iter().map(|(_, file)| file).collect()
+        self.filtered_files.iter().collect()
     }
 
     /// Returns all files and directories in the current working directory
@@ -884,17 +969,14 @@ impl<F: FileSystem> FileExplorer<F> {
 
     /// Compute filtered files with their original indices, returning owned File objects.
     /// This method clones the files to cache them in the filtered_files field.
-    fn compute_filtered_files(&self) -> Vec<(usize, File)> {
-        if let Some(filter) = self.search_filter() {
-            let filter_lower = filter.to_lowercase();
-            self.files
+    fn compute_filtered_files(&self) -> Vec<File> {
+        match &self.filter {
+            Some(predicate) => self
+                .files
                 .iter()
-                .enumerate()
-                .filter(|(_, file)| file.name().to_lowercase().contains(&filter_lower))
-                .map(|(idx, file)| (idx, file.clone()))
-                .collect()
-        } else {
-            self.files.iter().cloned().enumerate().collect()
+                .filter_map(|file| predicate(file))
+                .collect(),
+            None => self.files.clone(),
         }
     }
 
@@ -902,7 +984,7 @@ impl<F: FileSystem> FileExplorer<F> {
     fn filtered_selected_idx(&self) -> Option<usize> {
         self.filtered_files
             .iter()
-            .position(|(original_idx, _)| *original_idx == self.selected)
+            .position(|file| file.idx() == self.selected)
     }
 
     /// Get the files and directories in the current working directory and set them in the file explorer.
@@ -919,6 +1001,7 @@ impl<F: FileSystem> FileExplorer<F> {
             .into_iter()
             .filter(|entry| self.show_hidden || !entry.is_hidden)
             .map(|entry| File {
+                idx: 0,
                 name: entry.name,
                 path: PathBuf::from(entry.path),
                 is_dir: entry.is_dir,
@@ -936,6 +1019,7 @@ impl<F: FileSystem> FileExplorer<F> {
             files.insert(
                 0,
                 File {
+                    idx: 0,
                     name: "../".to_owned(),
                     path: parent.to_path_buf(),
                     is_dir: true,
@@ -949,6 +1033,9 @@ impl<F: FileSystem> FileExplorer<F> {
             );
         }
 
+        for (i, file) in files.iter_mut().enumerate() {
+            file.idx = i;
+        }
         self.files = files;
         self.filtered_files = self.compute_filtered_files();
         Ok(())
@@ -1010,6 +1097,7 @@ impl FileExplorer<LocalFileSystem> {
 /// A file or directory in the file explorer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct File {
+    idx: usize,
     name: String,
     path: PathBuf,
     is_file: bool,
@@ -1022,6 +1110,13 @@ pub struct File {
 }
 
 impl File {
+    /// Returns the original index of this file in the unfiltered file list.
+    #[inline]
+    #[must_use]
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
+
     /// Returns the name of the file or directory.
     ///
     /// # Examples
