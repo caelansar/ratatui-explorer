@@ -24,7 +24,7 @@ impl<F: FileSystem> StatefulRenderer<'_, F> {
     /// Render the file explorer widget with stateful tracking of scroll position.
     pub fn render(self, area: Rect, buf: &mut Buffer) {
         // Get filtered files and selected index
-        let files = self.0.files();
+        let files = self.0.filtered_files();
         let selected_idx = self.0.selected_idx();
 
         let mut state = TableState::default()
@@ -111,7 +111,7 @@ impl<F: FileSystem> WidgetRef for Renderer<'_, F> {
         Self: Sized,
     {
         // Get filtered files and selected index
-        let files = self.0.files();
+        let files = self.0.filtered_files();
         let selected_idx = self.0.selected_idx();
 
         let mut state = TableState::default()

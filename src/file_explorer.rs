@@ -773,8 +773,8 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     #[inline]
     #[must_use]
-    pub fn files(&self) -> Vec<&File> {
-        self.filtered_files.iter().collect()
+    pub fn files(&self) -> &[File] {
+        &self.files
     }
 
     /// Returns all files and directories in the current working directory
@@ -1177,7 +1177,7 @@ impl File {
         &self.path
     }
 
-    /// Returns `true` is the file is a directory.
+    /// Returns `true` if the file is a directory.
     ///
     /// # Examples
     /// Suppose you have this tree file, with `passport.png` selected inside `file_explorer`:
