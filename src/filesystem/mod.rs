@@ -4,7 +4,7 @@
 //! allowing the file explorer to work with both local filesystems and remote
 //! filesystems (like SFTP) through a common interface.
 
-use std::io::Result;
+use std::{future::Future, io::Result};
 
 mod local;
 
@@ -109,28 +109,28 @@ pub trait FileSystem: Send + Sync {
     ///
     /// Returns an error if the directory cannot be read (e.g., permission denied,
     /// path does not exist, not a directory).
-    async fn read_dir(&self, path: &str) -> Result<Vec<FileEntry>>;
+    fn read_dir(&self, path: &str) -> impl Future<Output = Result<Vec<FileEntry>>> + Send;
 
     /// Check if a path exists.
     ///
     /// # Errors
     ///
     /// Returns an error if the filesystem cannot be accessed.
-    async fn exists(&self, path: &str) -> Result<bool>;
+    fn exists(&self, path: &str) -> impl Future<Output = Result<bool>> + Send;
 
     /// Check if a path is a directory.
     ///
     /// # Errors
     ///
     /// Returns an error if the path does not exist or cannot be accessed.
-    async fn is_dir(&self, path: &str) -> Result<bool>;
+    fn is_dir(&self, path: &str) -> impl Future<Output = Result<bool>> + Send;
 
     /// Get the canonical/absolute path.
     ///
     /// # Errors
     ///
     /// Returns an error if the path cannot be canonicalized.
-    async fn canonicalize(&self, path: &str) -> Result<String>;
+    fn canonicalize(&self, path: &str) -> impl Future<Output = Result<String>> + Send;
 
     /// Get the parent directory of a path.
     ///
@@ -138,5 +138,5 @@ pub trait FileSystem: Send + Sync {
     fn parent(&self, path: &str) -> Option<String>;
 
     /// Delete a file at the given path.
-    async fn delete(&self, path: &str) -> Result<()>;
+    fn delete(&self, path: &str) -> impl Future<Output = Result<()>> + Send;
 }

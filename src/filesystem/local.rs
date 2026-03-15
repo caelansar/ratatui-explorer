@@ -184,21 +184,17 @@ impl FileSystem for LocalFileSystem {
     }
 
     async fn is_dir(&self, path: &str) -> Result<bool> {
-        let metadata = tokio::time::timeout(Duration::from_secs(2), tokio::fs::metadata(path))
+        tokio::time::timeout(Duration::from_secs(2), tokio::fs::metadata(path))
             .await
             .map_err(|_| Error::new(ErrorKind::TimedOut, "Timeout checking if path is directory"))?
-            .map_err(|e| e)?;
-
-        Ok(metadata.is_dir())
+            .map(|meta| Ok(meta.is_dir()))?
     }
 
     async fn canonicalize(&self, path: &str) -> Result<String> {
-        let canonical = tokio::time::timeout(Duration::from_secs(2), tokio::fs::canonicalize(path))
+        tokio::time::timeout(Duration::from_secs(2), tokio::fs::canonicalize(path))
             .await
             .map_err(|_| Error::new(ErrorKind::TimedOut, "Timeout canonicalizing path"))?
-            .map_err(|e| e)?;
-
-        Ok(canonical.to_string_lossy().to_string())
+            .map(|path| Ok(path.to_string_lossy().to_string()))?
     }
 
     fn parent(&self, path: &str) -> Option<String> {
@@ -208,11 +204,8 @@ impl FileSystem for LocalFileSystem {
     }
 
     async fn delete(&self, path: &str) -> Result<()> {
-        tokio::time::timeout(Duration::from_secs(5), tokio::fs::remove_file(path))
+        tokio::time::timeout(Duration::from_secs(2), tokio::fs::remove_file(path))
             .await
             .map_err(|_| Error::new(ErrorKind::TimedOut, "Timeout deleting file"))?
-            .map_err(|e| e)?;
-
-        Ok(())
     }
 }
