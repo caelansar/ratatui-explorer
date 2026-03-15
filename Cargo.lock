@@ -939,8 +939,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "ratatui-explorer"
-version = "0.2.1"
+name = "ratatui-async-explorer"
+version = "0.3.0"
 dependencies = [
  "educe",
  "ratatui",

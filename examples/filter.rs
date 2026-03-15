@@ -8,7 +8,7 @@ use crossterm::{
 use ratatui::crossterm;
 use ratatui::{prelude::*, widgets::*};
 
-use ratatui_explorer::{File, FileExplorer, Theme};
+use ratatui_async_explorer::{File, FileExplorer, Theme};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {

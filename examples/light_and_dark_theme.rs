@@ -11,7 +11,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders},
 };
 
-use ratatui_explorer::{FileExplorer, Theme};
+use ratatui_async_explorer::{FileExplorer, Theme};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
