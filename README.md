@@ -4,6 +4,7 @@
 
 Features:
 - File explorer functionality.
+- Async filesystem abstraction — supports both local and remote filesystems (e.g., SFTP) through the `FileSystem` trait.
 - Input handling (from [crossterm](https://docs.rs/crossterm/latest/crossterm/), [termion](https://docs.rs/termion/latest/termion/), [termwiz](https://docs.rs/termwiz/latest/termwiz/) and your own backend).
 - Customizable widget theming.
 
@@ -19,7 +20,7 @@ The simplest use of [ratatui-explorer](https://crates.io/crates/ratatui-explorer
 cargo run --example basic
 ```
 
-![basic usage demonstration](https://raw.githubusercontent.com/tatounee/ratatui-explorer/master/assets/basic.gif)
+![basic usage demonstration](./assets/basic.gif)
 
 ---
 
@@ -30,7 +31,7 @@ Switching custom themes while running.
 cargo run --example light_and_dark_theme
 ```
 
-![theme switching demonstration](https://raw.githubusercontent.com/tatounee/ratatui-explorer/master/assets/light_and_dark_theme.gif)
+![theme switching demonstration](./assets/light_and_dark_theme.gif)
 
 ---
 
@@ -41,8 +42,18 @@ Adapt the interface depending on the selected file.
 cargo run --example file_preview
 ```
 
-![file preview demonstration](https://raw.githubusercontent.com/tatounee/ratatui-explorer/master/assets/file_preview.gif)
+![file preview demonstration](./assets/file_preview.gif)
 
+---
+
+## [Filter](examples/filter.rs)
+Interactive file/directory search using `set_filter` to filter entries by name.
+
+```shell
+cargo run --example filter
+```
+
+![filter demonstration](./assets/filter.gif)
 
 # Basic usage
 Install the libraries in your `Cargo.toml` file:
@@ -96,6 +107,10 @@ async fn main() -> io::Result<()> {
 }
 ```
 
+## Async filesystem design
+
+The file explorer uses an async `FileSystem` trait to abstract filesystem operations. The default `LocalFileSystem` implementation works with the local disk, but you can implement the `FileSystem` trait for remote backends (e.g., SFTP) to browse remote file systems with the same widget.
+
 ## Customizing the theme
 You can customize the theme of the file explorer widget by using the `Theme` struct.
 ```rust
@@ -126,6 +141,10 @@ The following bindings are used by default for [crossterm](https://docs.rs/cross
 | `End`                             | Select the last entry                      |
 | `PageUp`                          | Scroll the selection up                    |
 | `PageDown`                        | Scroll the selection down                  |
-| `<Ctrl> + h      `                | Toggle between showing hidden files or not |
+| `<Ctrl> + h`                      | Toggle between showing hidden files or not |
 
 _*if the selected item is a directory_
+
+# Real world example
+
+- [termirs](https://github.com/caelansar/termirs) — A terminal file manager built with ratatui, using ratatui-explorer as its file explorer component.
