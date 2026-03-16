@@ -29,7 +29,7 @@ pub type FileFilter = Arc<dyn Fn(&File) -> Option<File> + Send + Sync>;
 /// Creating a new `FileExplorer` widget:
 ///
 /// ```no_run
-/// use ratatui_explorer::FileExplorer;
+/// use ratatui_async_explorer::FileExplorer;
 ///
 /// # tokio_test::block_on(async {
 /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -40,10 +40,10 @@ pub type FileFilter = Arc<dyn Fn(&File) -> Option<File> + Send + Sync>;
 /// Handling user input:
 ///
 /// ```no_run
-/// # fn get_event() -> ratatui_explorer::Input {
+/// # fn get_event() -> ratatui_async_explorer::Input {
 /// #   unimplemented!()
 /// # }
-/// use ratatui_explorer::FileExplorer;
+/// use ratatui_async_explorer::FileExplorer;
 ///
 /// # tokio_test::block_on(async {
 /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -55,7 +55,7 @@ pub type FileFilter = Arc<dyn Fn(&File) -> Option<File> + Send + Sync>;
 /// Accessing information about the current file selected and or the current working directory:
 ///
 /// ```no_run
-/// use ratatui_explorer::FileExplorer;
+/// use ratatui_async_explorer::FileExplorer;
 ///
 /// # tokio_test::block_on(async {
 /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -112,7 +112,7 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// ```no_run
     /// use std::sync::Arc;
-    /// use ratatui_explorer::{FileExplorer, LocalFileSystem};
+    /// use ratatui_async_explorer::{FileExplorer, LocalFileSystem};
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let fs = Arc::new(LocalFileSystem);
@@ -149,7 +149,7 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// ```no_run
     /// use ratatui::{Terminal, backend::CrosstermBackend};
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -181,7 +181,7 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// ```no_run
     /// use ratatui::{Terminal, backend::CrosstermBackend};
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -238,7 +238,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     /// You can handle input like this:
     /// ```no_run
-    /// use ratatui_explorer::{FileExplorer, Input};
+    /// use ratatui_async_explorer::{FileExplorer, Input};
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -385,7 +385,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -412,7 +412,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -435,7 +435,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::{FileExplorer, Theme};
+    /// use ratatui_async_explorer::{FileExplorer, Theme};
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -457,7 +457,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -501,13 +501,13 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
     ///
     /// // Filter to show only directories
-    /// file_explorer.set_filter(Some(|file: &ratatui_explorer::File| {
+    /// file_explorer.set_filter(Some(|file: &ratatui_async_explorer::File| {
     ///     if file.is_dir() {
     ///         Some(file.clone())
     ///     } else {
@@ -540,7 +540,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -556,12 +556,28 @@ impl<F: FileSystem> FileExplorer<F> {
         self.search_filter.as_deref()
     }
 
+    //
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratatui_async_explorer::FileExplorer;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let file_explorer = FileExplorer::new().await.unwrap();
+    /// let filesystem = file_explorer.filesystem();
+    /// # })
+    /// ```
+    pub fn filesystem(&self) -> &F {
+        &self.filesystem
+    }
+
     /// Returns the cached filtered files with their original indices.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let mut file_explorer = FileExplorer::new().await?;
@@ -603,7 +619,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     /// You can set the selected index like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -644,7 +660,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     /// You can get the current file like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -668,7 +684,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let mut file_explorer = FileExplorer::new().await?;
@@ -703,7 +719,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     /// You can get the current working directory like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -726,7 +742,7 @@ impl<F: FileSystem> FileExplorer<F> {
     ///
     /// You can get the current value like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -760,7 +776,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     /// You can get the [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) of files and directories like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -784,7 +800,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -817,7 +833,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```
     /// You can get the selected index like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -843,7 +859,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let mut file_explorer = FileExplorer::new().await.unwrap();
@@ -865,7 +881,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::{FileExplorer, Theme};
+    /// use ratatui_async_explorer::{FileExplorer, Theme};
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -906,7 +922,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// ```no_run
     /// use std::collections::HashSet;
     /// use std::path::PathBuf;
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let mut file_explorer = FileExplorer::new().await?;
@@ -929,7 +945,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let file_explorer = FileExplorer::new().await?;
@@ -949,7 +965,7 @@ impl<F: FileSystem> FileExplorer<F> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let file_explorer = FileExplorer::new().await?;
@@ -1056,7 +1072,7 @@ impl FileExplorer<LocalFileSystem> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let file_explorer = FileExplorer::new().await?;
@@ -1079,7 +1095,7 @@ impl FileExplorer<LocalFileSystem> {
     /// # Examples
     ///
     /// ```no_run
-    /// use ratatui_explorer::{FileExplorer, Theme};
+    /// use ratatui_async_explorer::{FileExplorer, Theme};
     ///
     /// # async fn example() -> std::io::Result<()> {
     /// let file_explorer = FileExplorer::with_theme(Theme::default().add_default_title()).await?;
@@ -1130,7 +1146,7 @@ impl File {
     /// ```
     /// You can get the name of the selected file like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -1160,7 +1176,7 @@ impl File {
     /// ```
     /// You can get the path of the selected file like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -1190,7 +1206,7 @@ impl File {
     /// ```
     /// You can know if the selected file is a directory like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -1232,7 +1248,7 @@ impl File {
     /// ```
     /// You can know if the selected file is a regular file like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();
@@ -1267,7 +1283,7 @@ impl File {
     /// ```
     /// You can know if the selected file or directory is hidden like this:
     /// ```no_run
-    /// use ratatui_explorer::FileExplorer;
+    /// use ratatui_async_explorer::FileExplorer;
     ///
     /// # tokio_test::block_on(async {
     /// let file_explorer = FileExplorer::new().await.unwrap();

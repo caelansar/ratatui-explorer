@@ -1,6 +1,6 @@
-# ratatui-explorer
+# ratatui-async-explorer
 
-[ratatui-explorer](https://crates.io/crates/ratatui-explorer) is a simple library for creating file explorers for [ratatui](https://github.com/ratatui-org/ratatui).
+[ratatui-async-explorer](https://crates.io/crates/ratatui-async-explorer) is a simple library for creating file explorers for [ratatui](https://github.com/ratatui-org/ratatui).
 
 Features:
 - File explorer functionality.
@@ -13,7 +13,7 @@ Features:
 Run `cargo run --example` to try the different example available.
 
 ## [Basic usage](examples/basic.rs)
-The simplest use of [ratatui-explorer](https://crates.io/crates/ratatui-explorer) with the [crossterm](https://docs.rs/crossterm/latest/crossterm/) backend.
+The simplest use of ratatui-async-explorer with the [crossterm](https://docs.rs/crossterm/latest/crossterm/) backend.
 
 
 ```shell
@@ -71,7 +71,7 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
-use ratatui_explorer::{FileExplorer, Theme};
+use ratatui_async_explorer::{FileExplorer, Theme};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -115,7 +115,7 @@ The file explorer uses an async `FileSystem` trait to abstract filesystem operat
 You can customize the theme of the file explorer widget by using the `Theme` struct.
 ```rust
 use ratatui::{prelude::*, widgets::*};
-use ratatui_explorer::Theme;
+use ratatui_async_explorer::Theme;
 
 let theme: Theme = Theme::default()
     .add_default_title()
@@ -147,4 +147,4 @@ _*if the selected item is a directory_
 
 # Real world example
 
-- [termirs](https://github.com/caelansar/termirs) — A terminal file manager built with ratatui, using ratatui-explorer as its file explorer component.
+- [termirs](https://github.com/caelansar/termirs) — A modern, async SSH/SFTP terminal client, using ratatui-explorer as its file explorer component.
