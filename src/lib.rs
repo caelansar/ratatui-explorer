@@ -17,5 +17,6 @@ pub mod filesystem;
 
 pub use file_explorer::{File, FileExplorer, FileFilter};
 pub use filesystem::{FileEntry, FilePermissions, FileSystem, LocalFileSystem};
+pub use icon::IconDisplay;
 pub use input::Input;
 pub use widget::{StatefulRenderer, Theme};

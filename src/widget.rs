@@ -10,7 +10,7 @@ use ratatui::{
     },
 };
 
-use crate::{filesystem::FileSystem, File, FileExplorer};
+use crate::{filesystem::FileSystem, icon::IconDisplay, File, FileExplorer};
 
 type LineFactory<F> = Arc<dyn Fn(&FileExplorer<F>) -> Line<'static> + Send + Sync>;
 
@@ -209,8 +209,8 @@ impl File {
             .map(|p: crate::FilePermissions| p.to_string(self.is_dir()))
             .unwrap_or_else(|| "---------".to_string());
 
-        let icon = if theme.use_icons {
-            Some(crate::icon::resolve_icon(self))
+        let icon = if theme.icon_display.is_enabled() {
+            Some(crate::icon::resolve_icon(self, theme.icon_display))
         } else {
             None
         };
@@ -222,11 +222,7 @@ impl File {
         };
 
         let name_cell = if let Some(icon) = icon {
-            let icon_style = if theme.use_icon_colors {
-                icon.color.map_or(final_style, |fg| Style::default().fg(fg))
-            } else {
-                final_style
-            };
+            let icon_style = icon.color.map_or(final_style, |fg| Style::default().fg(fg));
 
             let spans = if is_selected {
                 vec![
@@ -350,8 +346,7 @@ pub struct Theme<F: FileSystem = crate::filesystem::LocalFileSystem> {
     scroll_padding: usize,
     selected_marker: String,
     header_style: Style,
-    use_icons: bool,
-    use_icon_colors: bool,
+    icon_display: IconDisplay,
 }
 
 impl<F: FileSystem> Theme<F> {
@@ -380,8 +375,7 @@ impl<F: FileSystem> Theme<F> {
             scroll_padding: 0,
             selected_marker: "[✓]".to_string(),
             header_style: Style::new(),
-            use_icons: false,
-            use_icon_colors: false,
+            icon_display: IconDisplay::None,
         }
     }
 
@@ -609,26 +603,32 @@ impl<F: FileSystem> Theme<F> {
     /// # use ratatui_async_explorer::Theme;
     /// let theme: Theme = Theme::default().use_icons(true);
     /// ```
+    #[deprecated(since = "0.3.3", note = "use `with_icons` instead")]
     pub fn use_icons(mut self, use_icons: bool) -> Self {
-        self.use_icons = use_icons;
+        self.icon_display = if use_icons {
+            IconDisplay::Plain
+        } else {
+            IconDisplay::None
+        };
         self
     }
 
-    /// Sets whether to use per-icon colors for the file explorer.
+    /// Sets how file icons are displayed.
     ///
-    /// When enabled, each file type icon gets its own foreground color.
-    /// Requires a true-color terminal for best results.
-    /// This option has no effect unless [`use_icons`](#method.use_icons) is also enabled.
+    /// - [`IconDisplay::None`] — no icons (default)
+    /// - [`IconDisplay::Plain`] — icons without per-icon colors (inherit row style)
+    /// - [`IconDisplay::Dark`] — icons with bright colors for dark backgrounds
+    /// - [`IconDisplay::Light`] — icons with muted colors for light backgrounds
     ///
-    /// By default, icon colors are not used.
+    /// Colored variants require a Nerd Font and a true-color terminal.
     ///
     /// # Example
     /// ```no_run
-    /// # use ratatui_async_explorer::Theme;
-    /// let theme: Theme = Theme::default().use_icons(true).use_icon_colors(true);
+    /// # use ratatui_async_explorer::{Theme, IconDisplay};
+    /// let theme: Theme = Theme::default().with_icons(IconDisplay::Dark);
     /// ```
-    pub fn use_icon_colors(mut self, use_icon_colors: bool) -> Self {
-        self.use_icon_colors = use_icon_colors;
+    pub fn with_icons(mut self, icon_display: IconDisplay) -> Self {
+        self.icon_display = icon_display;
         self
     }
 
@@ -835,8 +835,7 @@ impl<F: FileSystem> Default for Theme<F> {
             header_style: Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
-            use_icons: false,
-            use_icon_colors: false,
+            icon_display: IconDisplay::None,
         }
     }
 }
