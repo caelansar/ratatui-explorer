@@ -9,6 +9,7 @@
 #![warn(rustdoc::missing_crate_level_docs)]
 #![warn(rustdoc::unescaped_backticks)]
 mod file_explorer;
+mod icon;
 mod input;
 mod widget;
 

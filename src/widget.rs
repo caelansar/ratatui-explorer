@@ -4,7 +4,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{
         Block, Borders, Cell, HighlightSpacing, Row, StatefulWidget, Table, TableState, WidgetRef,
     },
@@ -204,51 +204,60 @@ impl File {
             style
         };
 
-        // Format permissions
         let permissions_str = self
             .permissions()
             .map(|p: crate::FilePermissions| p.to_string(self.is_dir()))
             .unwrap_or_else(|| "---------".to_string());
 
-        // File type indicator
-        let file_type_indicator = if theme.use_icons {
-            if self.is_dir() {
-                ""
-            } else {
-                ""
-            }
+        let icon = if theme.use_icons {
+            Some(crate::icon::resolve_icon(self))
         } else {
-            ""
+            None
         };
 
-        // Format name with type indicator and selected marker
         let base_name = if let Some(target) = &self.symlink_target() {
             format!("{} -> {}", self.name(), target)
         } else {
             self.name().to_string()
         };
 
-        let name = match (is_selected, file_type_indicator.is_empty()) {
-            (true, true) => format!("{} {}", theme.selected_marker(), base_name),
-            (true, false) => format!(
-                "{} {} {}",
-                file_type_indicator,
-                theme.selected_marker(),
+        let name_cell = if let Some(icon) = icon {
+            let icon_style = if theme.use_icon_colors {
+                icon.color.map_or(final_style, |fg| Style::default().fg(fg))
+            } else {
+                final_style
+            };
+
+            let spans = if is_selected {
+                vec![
+                    Span::styled(icon.text, icon_style),
+                    Span::raw(" "),
+                    Span::styled(format!("{} ", theme.selected_marker()), final_style),
+                    Span::styled(base_name, final_style),
+                ]
+            } else {
+                vec![
+                    Span::styled(icon.text, icon_style),
+                    Span::raw(" "),
+                    Span::styled(base_name, final_style),
+                ]
+            };
+            Cell::from(Line::from(spans))
+        } else {
+            let name = if is_selected {
+                format!("{} {}", theme.selected_marker(), base_name)
+            } else {
                 base_name
-            ),
-            (false, true) => base_name,
-            (false, false) => format!("{} {}", file_type_indicator, base_name),
+            };
+            Cell::from(name).style(final_style)
         };
 
-        // Format size
         let size_str = self.size().map(format_size).unwrap_or_default();
-
-        // Format modified time
         let modified_str = self.modified().map(format_time).unwrap_or_default();
 
         Row::new(vec![
             Cell::from(permissions_str).style(final_style),
-            Cell::from(name).style(final_style),
+            name_cell,
             Cell::from(size_str).style(final_style),
             Cell::from(modified_str).style(final_style),
         ])
@@ -342,6 +351,7 @@ pub struct Theme<F: FileSystem = crate::filesystem::LocalFileSystem> {
     selected_marker: String,
     header_style: Style,
     use_icons: bool,
+    use_icon_colors: bool,
 }
 
 impl<F: FileSystem> Theme<F> {
@@ -371,6 +381,7 @@ impl<F: FileSystem> Theme<F> {
             selected_marker: "[✓]".to_string(),
             header_style: Style::new(),
             use_icons: false,
+            use_icon_colors: false,
         }
     }
 
@@ -603,6 +614,24 @@ impl<F: FileSystem> Theme<F> {
         self
     }
 
+    /// Sets whether to use per-icon colors for the file explorer.
+    ///
+    /// When enabled, each file type icon gets its own foreground color.
+    /// Requires a true-color terminal for best results.
+    /// This option has no effect unless [`use_icons`](#method.use_icons) is also enabled.
+    ///
+    /// By default, icon colors are not used.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use ratatui_async_explorer::Theme;
+    /// let theme: Theme = Theme::default().use_icons(true).use_icon_colors(true);
+    /// ```
+    pub fn use_icon_colors(mut self, use_icon_colors: bool) -> Self {
+        self.use_icon_colors = use_icon_colors;
+        self
+    }
+
     /// Sets the style for the table header row.
     ///
     /// # Example
@@ -807,6 +836,7 @@ impl<F: FileSystem> Default for Theme<F> {
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
             use_icons: false,
+            use_icon_colors: false,
         }
     }
 }

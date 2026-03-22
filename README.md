@@ -58,7 +58,7 @@ cargo run --example filter
 # Basic usage
 Install the libraries in your `Cargo.toml` file:
 ```plaintext
-cargo add ratatui ratatui-explorer crossterm
+cargo add ratatui ratatui-async-explorer crossterm
 ```
 Then inside your `main.rs` file:
 ```rust,no_run,ignore
@@ -147,4 +147,4 @@ _*if the selected item is a directory_
 
 # Real world example
 
-- [termirs](https://github.com/caelansar/termirs) — A modern, async SSH/SFTP terminal client, using ratatui-explorer as its file explorer component.
+- [termirs](https://github.com/caelansar/termirs) — A modern, async SSH/SFTP terminal client, using ratatui-async-explorer as its file explorer component.

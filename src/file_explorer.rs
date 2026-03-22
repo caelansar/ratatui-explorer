@@ -1327,4 +1327,25 @@ impl File {
     pub const fn permissions(&self) -> Option<crate::filesystem::FilePermissions> {
         self.permissions
     }
+
+    #[cfg(test)]
+    pub(crate) fn new_for_test(
+        name: &str,
+        is_dir: bool,
+        symlink_target: Option<&str>,
+        permissions: Option<crate::filesystem::FilePermissions>,
+    ) -> Self {
+        Self {
+            idx: 0,
+            name: name.to_string(),
+            path: PathBuf::from(name),
+            is_file: !is_dir,
+            is_dir,
+            is_hidden: name.starts_with('.'),
+            size: None,
+            modified: None,
+            permissions,
+            symlink_target: symlink_target.map(String::from),
+        }
+    }
 }
