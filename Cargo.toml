@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-async-explorer"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 authors = ["caelansar"]
 description = "ratatui-explorer is a small, but highly customizable, file explorer widget for ratatui."
@@ -23,6 +23,7 @@ educe = { version = "0.6.0", features = [
 ], default-features = false }
 tokio = { version = "1.0", features = ["fs", "macros", "rt-multi-thread", "time"] }
 tracing = "0.1"
+chrono = "0.4.44"
 
 [dev-dependencies]
 tokio-test = "0.4"
